@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import Button from '$lib/components/ui/button.svelte';
 	import Card from '$lib/components/ui/card.svelte';
+	import { t } from '$lib/i18n';
 
 	let selectedType = $state<'woman' | 'sponsor' | null>(null);
 	let loading = $state(false);
@@ -31,14 +32,14 @@
 			<h1
 				class="bg-gradient-to-r from-rose-500 to-orange-500 bg-clip-text text-3xl font-bold text-transparent"
 			>
-				Complete Your Profile
+				{$t.onboarding.title}
 			</h1>
-			<p class="mt-2 text-gray-600 dark:text-gray-400">Tell us how you want to use PEAL</p>
+			<p class="mt-2 text-gray-600 dark:text-gray-400">{$t.onboarding.subtitle}</p>
 		</div>
 
 		<!-- Role Selection -->
 		<Card class="p-6">
-			<h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">I am a...</h2>
+			<h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{$t.onboarding.selectType}</h2>
 
 			<div class="grid gap-4">
 				<button
@@ -49,10 +50,8 @@
 						: 'border-gray-200 hover:border-gray-300 dark:border-gray-700'}"
 				>
 					<span class="mb-3 block text-4xl">👩</span>
-					<h3 class="mb-1 font-semibold text-gray-900 dark:text-white">Woman</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400">
-						Seeking mentorship, funding, and community support
-					</p>
+					<h3 class="mb-1 font-semibold text-gray-900 dark:text-white">{$t.onboarding.woman}</h3>
+					<p class="text-sm text-gray-500 dark:text-gray-400">{$t.onboarding.womanDesc}</p>
 				</button>
 
 				<button
@@ -63,15 +62,13 @@
 						: 'border-gray-200 hover:border-gray-300 dark:border-gray-700'}"
 				>
 					<span class="mb-3 block text-4xl">🤝</span>
-					<h3 class="mb-1 font-semibold text-gray-900 dark:text-white">Sponsor</h3>
-					<p class="text-sm text-gray-500 dark:text-gray-400">
-						Looking to mentor and support women
-					</p>
+					<h3 class="mb-1 font-semibold text-gray-900 dark:text-white">{$t.onboarding.sponsor}</h3>
+					<p class="text-sm text-gray-500 dark:text-gray-400">{$t.onboarding.sponsorDesc}</p>
 				</button>
 			</div>
 
 			<Button onclick={handleComplete} disabled={!selectedType} {loading} class="mt-6 w-full">
-				{loading ? 'Setting up...' : 'Continue to Dashboard'}
+				{loading ? $t.onboarding.settingUp : $t.onboarding.continueToDashboard}
 			</Button>
 		</Card>
 	</div>

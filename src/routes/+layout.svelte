@@ -5,6 +5,7 @@
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
+	import { isRTL } from '$lib/i18n';
 
 	let { children } = $props();
 
@@ -40,6 +41,7 @@
 
 <main
 	class="min-h-[calc(100dvh-7.5rem)] overflow-x-hidden pt-16 pb-14 lg:min-h-screen lg:pt-0 lg:pb-0 lg:pl-72"
+	dir={$isRTL ? 'rtl' : 'ltr'}
 >
 	{@render children()}
 </main>

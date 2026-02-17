@@ -18,6 +18,7 @@
 	} from 'lucide-svelte';
 	import { mockVideos } from '$lib/data/mock';
 	import type { Video } from '$lib/data/mock';
+	import { t } from '$lib/i18n';
 
 	let viewMode = $state<'grid' | 'vertical'>('vertical');
 	let searchQuery = $state('');
@@ -34,16 +35,16 @@
 		'marketing'
 	];
 
-	const hashtags = [
-		'#WomenInTech',
-		'#Entrepreneurship',
-		'#Mentorship',
-		'#Funding',
-		'#SuccessStories',
-		'#WomenLeaders',
-		'#Startup',
-		'#Empowerment'
-	];
+	const hashtags = $derived([
+		$t.hashtags.womenInTech,
+		$t.hashtags.entrepreneurshipTag,
+		$t.hashtags.mentorshipTag,
+		$t.hashtags.fundingTag,
+		$t.hashtags.successStoriesTag,
+		$t.hashtags.womenLeadersTag,
+		$t.hashtags.startupTag,
+		$t.hashtags.empowermentTag
+	]);
 
 	const filteredVideos = $derived(
 		mockVideos
@@ -86,25 +87,23 @@
 			<div class="mb-6 flex flex-col gap-4">
 				<div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
 					<div>
-						<h1 class="text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">Video Feed</h1>
-						<p class="text-gray-600 dark:text-gray-400">
-							Discover inspiring stories from the community
-						</p>
+						<h1 class="text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">{$t.feed.title}</h1>
+						<p class="text-gray-600 dark:text-gray-400">{$t.feed.discoverStories}</p>
 					</div>
 
 					<!-- Action Buttons -->
 					<div class="flex items-center gap-2">
 						<Button variant="secondary" size="sm">
 							<Heart class="mr-1 h-4 w-4" />
-							Like
+							{$t.common.like}
 						</Button>
 						<Button variant="secondary" size="sm">
 							<Share2 class="mr-1 h-4 w-4" />
-							Share
+							{$t.common.share}
 						</Button>
 						<Button variant="secondary" size="sm">
 							<SlidersHorizontal class="mr-1 h-4 w-4" />
-							Filter
+							{$t.common.filter}
 						</Button>
 					</div>
 				</div>
@@ -115,7 +114,7 @@
 						<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
 						<input
 							type="text"
-							placeholder="Search videos..."
+							placeholder={$t.feed.searchPlaceholder}
 							bind:value={searchQuery}
 							class="h-10 w-full rounded-xl border border-gray-200 bg-white pr-4 pl-10 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 						/>
@@ -217,7 +216,7 @@
 										<span
 											class="rounded-lg bg-black/60 px-3 py-1 text-xs font-medium text-gray-300"
 										>
-											Not Trending
+											{$t.feed.notTrending}
 										</span>
 									{/if}
 								</div>
@@ -274,7 +273,7 @@
 
 			{#if filteredVideos.length === 0}
 				<div class="py-12 text-center">
-					<p class="text-gray-500 dark:text-gray-400">No videos found matching your criteria.</p>
+					<p class="text-gray-500 dark:text-gray-400">{$t.feed.noVideosFound}</p>
 				</div>
 			{/if}
 		</div>

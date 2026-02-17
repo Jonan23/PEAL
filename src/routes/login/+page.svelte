@@ -3,6 +3,7 @@
 	import { ArrowRight } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
+	import { t } from '$lib/i18n';
 
 	let email = $state('');
 	let password = $state('');
@@ -34,9 +35,9 @@
 			<h1
 				class="bg-gradient-to-r from-rose-500 to-orange-500 bg-clip-text text-3xl font-bold text-transparent"
 			>
-				Welcome Back
+				{$t.auth.welcomeBack}
 			</h1>
-			<p class="mt-2 text-gray-600 dark:text-gray-400">Sign in to continue your journey</p>
+			<p class="mt-2 text-gray-600 dark:text-gray-400">{$t.auth.signInToContinue}</p>
 		</div>
 
 		<!-- Form Card -->
@@ -44,7 +45,7 @@
 			<form onsubmit={handleSubmit} class="space-y-4">
 				<Input
 					type="email"
-					label="Email"
+					label={$t.auth.email}
 					placeholder="you@example.com"
 					bind:value={email}
 					required
@@ -52,7 +53,7 @@
 
 				<Input
 					type="password"
-					label="Password"
+					label={$t.auth.password}
 					placeholder="Enter your password"
 					bind:value={password}
 					required
@@ -64,18 +65,18 @@
 							type="checkbox"
 							class="rounded border-gray-300 text-rose-500 focus:ring-rose-500"
 						/>
-						<span class="text-gray-600 dark:text-gray-400">Remember me</span>
+						<span class="text-gray-600 dark:text-gray-400">{$t.auth.rememberMe}</span>
 					</label>
 					<a href="/forgot-password" class="text-sm text-rose-500 hover:text-rose-600"
-						>Forgot password?</a
+						>{$t.auth.forgotPassword}</a
 					>
 				</div>
 
 				<Button type="submit" class="w-full" size="lg" {loading}>
 					{#if loading}
-						Signing in...
+						{$t.auth.signingIn}
 					{:else}
-						Sign In
+						{$t.auth.signIn}
 						<ArrowRight class="ml-2 h-4 w-4" />
 					{/if}
 				</Button>
@@ -87,7 +88,7 @@
 					<div class="w-full border-t border-gray-200 dark:border-gray-700"></div>
 				</div>
 				<div class="relative flex justify-center text-sm">
-					<span class="bg-white px-4 text-gray-500 dark:bg-gray-900">Or continue with</span>
+					<span class="bg-white px-4 text-gray-500 dark:bg-gray-900">{$t.auth.continueWith}</span>
 				</div>
 			</div>
 
@@ -127,8 +128,8 @@
 
 		<!-- Sign Up Link -->
 		<p class="mt-6 text-center text-gray-600 dark:text-gray-400">
-			Don't have an account?
-			<a href="/register" class="font-medium text-rose-500 hover:text-rose-600">Sign up</a>
+			{$t.auth.noAccount}
+			<a href="/register" class="font-medium text-rose-500 hover:text-rose-600">{$t.auth.signUp}</a>
 		</p>
 	</div>
 </div>

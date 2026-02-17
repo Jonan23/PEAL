@@ -14,6 +14,7 @@
 		SlidersHorizontal
 	} from 'lucide-svelte';
 	import { mockMentors } from '$lib/data/mock';
+	import { t } from '$lib/i18n';
 
 	let searchQuery = $state('');
 	let selectedSkill = $state('all');
@@ -61,10 +62,10 @@
 			<!-- Header -->
 			<div class="mb-6">
 				<h1 class="mb-2 text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">
-					Find a Mentor
+					{$t.mentors.title}
 				</h1>
 				<p class="text-gray-600 dark:text-gray-400">
-					Connect with experienced mentors who can guide your journey
+					{$t.mentors.subtitle}
 				</p>
 			</div>
 
@@ -72,7 +73,7 @@
 			<div class="mb-4">
 				<Button>
 					<Briefcase class="mr-2 h-4 w-4" />
-					Become a Mentor
+					{$t.mentors.becomeMentor}
 				</Button>
 			</div>
 
@@ -81,7 +82,7 @@
 				<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
 				<input
 					type="text"
-					placeholder="Search by name or skill..."
+					placeholder={$t.mentors.searchPlaceholder}
 					bind:value={searchQuery}
 					class="h-12 w-full rounded-xl border border-gray-200 bg-white pr-4 pl-10 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 				/>
@@ -93,7 +94,7 @@
 					bind:value={selectedSkill}
 					class="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 				>
-					<option value="all">All Skills</option>
+					<option value="all">{$t.mentors.allSkills}</option>
 					{#each skills as skill}
 						<option value={skill}>{skill}</option>
 					{/each}
@@ -101,7 +102,7 @@
 
 				<Button variant="secondary" size="sm">
 					<SlidersHorizontal class="mr-1 h-4 w-4" />
-					More Filters
+					{$t.mentors.moreFilters}
 				</Button>
 			</div>
 
@@ -111,7 +112,7 @@
 					<div class="flex gap-4">
 						<!-- Connect Button on Left -->
 						<div class="hidden lg:flex lg:flex-col lg:justify-center">
-							<Button size="sm">Connect</Button>
+							<Button size="sm">{$t.mentors.connect}</Button>
 						</div>
 
 						<Card class="flex-1 p-4">
@@ -189,7 +190,7 @@
 
 							<!-- Mobile Connect Button -->
 							<div class="mt-4 lg:hidden">
-								<Button class="w-full">Connect</Button>
+								<Button class="w-full">{$t.mentors.connect}</Button>
 							</div>
 						</Card>
 					</div>

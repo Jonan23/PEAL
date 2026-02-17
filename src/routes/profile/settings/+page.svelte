@@ -4,7 +4,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Avatar from '$lib/components/ui/avatar.svelte';
 	import { theme } from '$lib/stores/theme';
-	import { language } from '$lib/i18n';
+	import { language, availableLanguages, t } from '$lib/i18n';
 	import { type Language } from '$lib/i18n/translations';
 	import {
 		Save,
@@ -117,7 +117,7 @@
 
 	<main class="pt-16 pb-20 lg:ml-72 lg:pt-0 lg:pb-0">
 		<div class="container mx-auto max-w-3xl px-4 py-6 lg:p-8">
-			<h1 class="mb-8 text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">Settings</h1>
+			<h1 class="mb-8 text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">{$t.settings.title}</h1>
 
 			<!-- Profile Section -->
 			<section class="mb-8">
@@ -125,20 +125,20 @@
 					class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
 				>
 					<User class="h-5 w-5" />
-					Profile
+					{$t.settings.profile}
 				</h2>
 				<Card class="p-5">
 					<div class="mb-6 flex items-start gap-4">
 						<Avatar src={currentUser.avatar} alt={currentUser.name} size="xl" />
 						<div class="flex-1">
-							<Button variant="secondary" size="sm">Change Photo</Button>
-							<p class="mt-2 text-xs text-gray-500">JPG, PNG or GIF. Max 2MB.</p>
+							<Button variant="secondary" size="sm">{$t.settings.changePhoto}</Button>
+							<p class="mt-2 text-xs text-gray-500">{$t.settings.photoHint}</p>
 						</div>
 					</div>
 					<div class="grid gap-4">
 						<div>
 							<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-								>Name</label
+								>{$t.settings.name}</label
 							>
 							<input
 								type="text"
@@ -148,7 +148,7 @@
 						</div>
 						<div>
 							<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-								>Email</label
+								>{$t.settings.email}</label
 							>
 							<input
 								type="email"
@@ -158,22 +158,22 @@
 						</div>
 						<div>
 							<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-								>Location</label
+								>{$t.settings.location}</label
 							>
 							<input
 								type="text"
 								value={currentUser.location || ''}
-								placeholder="City, Country"
+								placeholder={$t.settings.locationPlaceholder || 'City, Country'}
 								class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 							/>
 						</div>
 						<div>
 							<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-								>Bio</label
+								>{$t.settings.bio}</label
 							>
 							<textarea
 								value={currentUser.bio || ''}
-								placeholder="Tell us about yourself..."
+								placeholder={$t.settings.bioPlaceholder || 'Tell us about yourself...'}
 								rows="3"
 								class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 							></textarea>
@@ -183,7 +183,7 @@
 					<!-- Skills -->
 					<div class="mt-6">
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>Skills (up to 5)</label
+							>{$t.settings.skills} {$t.settings.skillsHint}</label
 						>
 						<div class="mb-3 flex flex-wrap gap-2">
 							{#each userSkills as skill}
@@ -206,13 +206,13 @@
 									bind:value={newSkill}
 									class="h-10 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 								>
-									<option value="">Add a skill...</option>
+									<option value="">{$t.settings.addSkill}</option>
 									{#each availableSkills.filter((s) => !userSkills.includes(s)) as skill}
 										<option value={skill}>{skill}</option>
 									{/each}
 								</select>
 								<Button variant="secondary" size="sm" onclick={addSkill} disabled={!newSkill}
-									>Add</Button
+									>{$t.common.add}</Button
 								>
 							</div>
 						{/if}
@@ -221,7 +221,7 @@
 					<!-- Interests -->
 					<div class="mt-6">
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>Interests (up to 5)</label
+							>{$t.settings.interests} {$t.settings.interestsHint}</label
 						>
 						<div class="mb-3 flex flex-wrap gap-2">
 							{#each userInterests as interest}
@@ -244,13 +244,13 @@
 									bind:value={newInterest}
 									class="h-10 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 								>
-									<option value="">Add an interest...</option>
+									<option value="">{$t.settings.addInterest}</option>
 									{#each availableInterests.filter((i) => !userInterests.includes(i)) as interest}
 										<option value={interest}>{interest}</option>
 									{/each}
 								</select>
 								<Button variant="secondary" size="sm" onclick={addInterest} disabled={!newInterest}
-									>Add</Button
+									>{$t.common.add}</Button
 								>
 							</div>
 						{/if}
@@ -264,12 +264,12 @@
 					class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
 				>
 					<Moon class="h-5 w-5" />
-					Appearance
+					{$t.settings.appearance}
 				</h2>
 				<Card class="p-5">
 					<div class="mb-4">
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>Theme</label
+							>{$t.settings.theme}</label
 						>
 						<div class="flex gap-3">
 							<button
@@ -279,7 +279,7 @@
 									: 'border-gray-200 hover:border-gray-300 dark:border-gray-700'}"
 							>
 								<Sun class="mx-auto mb-2 h-6 w-6 text-orange-500" />
-								<p class="text-sm font-medium">Light</p>
+								<p class="text-sm font-medium">{$t.settings.light}</p>
 							</button>
 							<button
 								onclick={() => setTheme('dark')}
@@ -288,25 +288,25 @@
 									: 'border-gray-200 hover:border-gray-300 dark:border-gray-700'}"
 							>
 								<Moon class="mx-auto mb-2 h-6 w-6 text-violet-500" />
-								<p class="text-sm font-medium">Dark</p>
+								<p class="text-sm font-medium">{$t.settings.dark}</p>
 							</button>
 						</div>
 					</div>
 					<div>
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>Language</label
+							>{$t.settings.language}</label
 						>
 						<div class="grid grid-cols-2 gap-3">
-							{#each [{ code: 'en', label: 'English', flag: '🇺🇸' }, { code: 'es', label: 'Español', flag: '🇪🇸' }, { code: 'fr', label: 'Français', flag: '🇫🇷' }, { code: 'pt', label: 'Português', flag: '🇧🇷' }] as lang}
+							{#each availableLanguages as lang}
 								<button
-									onclick={() => setLanguage(lang.code as Language)}
+									onclick={() => setLanguage(lang.code)}
 									class="flex items-center gap-3 rounded-xl border-2 p-3 transition-all {selectedLanguage ===
 									lang.code
 										? 'border-rose-500 bg-rose-50 dark:bg-rose-900/20'
 										: 'border-gray-200 hover:border-gray-300 dark:border-gray-700'}"
 								>
 									<span class="text-xl">{lang.flag}</span>
-									<span class="font-medium">{lang.label}</span>
+									<span class="font-medium">{lang.name}</span>
 								</button>
 							{/each}
 						</div>
@@ -316,18 +316,16 @@
 
 			<!-- Notifications Section -->
 			<section class="mb-8">
-				<h2
-					class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
-				>
-					<Bell class="h-5 w-5" />
-					Notifications
+<h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+					<AlertTriangle class="h-5 w-5" />
+					{$t.settings.account}
 				</h2>
 				<Card class="p-5">
 					<div class="space-y-4">
 						<div class="flex items-center justify-between">
 							<div>
-								<p class="font-medium text-gray-900 dark:text-white">Email Notifications</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">Receive updates via email</p>
+								<p class="font-medium text-gray-900 dark:text-white">{$t.settings.emailNotifications}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.emailNotificationsDesc}</p>
 							</div>
 							<button
 								onclick={() => (emailNotifications = !emailNotifications)}
@@ -344,8 +342,8 @@
 						</div>
 						<div class="flex items-center justify-between">
 							<div>
-								<p class="font-medium text-gray-900 dark:text-white">Push Notifications</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">Receive push notifications</p>
+								<p class="font-medium text-gray-900 dark:text-white">{$t.settings.pushNotifications}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.pushNotificationsDesc}</p>
 							</div>
 							<button
 								onclick={() => (pushNotifications = !pushNotifications)}
@@ -362,15 +360,13 @@
 						</div>
 						<div class="border-t border-gray-100 pt-4 dark:border-gray-800">
 							<p class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-								Activity Notifications
+								{$t.settings.activityNotifications}
 							</p>
 						</div>
 						<div class="flex items-center justify-between">
 							<div>
-								<p class="font-medium text-gray-900 dark:text-white">Mentor Messages</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">
-									Get notified when mentors message you
-								</p>
+								<p class="font-medium text-gray-900 dark:text-white">{$t.settings.mentorMessages}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.mentorMessagesDesc}</p>
 							</div>
 							<button
 								onclick={() => (mentorMessages = !mentorMessages)}
@@ -387,8 +383,8 @@
 						</div>
 						<div class="flex items-center justify-between">
 							<div>
-								<p class="font-medium text-gray-900 dark:text-white">Supporter Updates</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">Updates from your supporters</p>
+								<p class="font-medium text-gray-900 dark:text-white">{$t.settings.supporterUpdates}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.supporterUpdatesDesc}</p>
 							</div>
 							<button
 								onclick={() => (supporterUpdates = !supporterUpdates)}
@@ -405,10 +401,8 @@
 						</div>
 						<div class="flex items-center justify-between">
 							<div>
-								<p class="font-medium text-gray-900 dark:text-white">Weekly Digest</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">
-									Weekly summary of platform activity
-								</p>
+								<p class="font-medium text-gray-900 dark:text-white">{$t.settings.weeklyDigest}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.weeklyDigestDesc}</p>
 							</div>
 							<button
 								onclick={() => (weeklyDigest = !weeklyDigest)}
@@ -483,10 +477,8 @@
 				<Card class="p-5">
 					<div class="flex items-center justify-between">
 						<div>
-							<p class="font-medium text-gray-900 dark:text-white">Public Profile</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">
-								Allow others to view your profile
-							</p>
+							<p class="font-medium text-gray-900 dark:text-white">{$t.settings.publicProfile}</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.publicProfileDesc}</p>
 						</div>
 						<button
 							onclick={() => (publicProfile = !publicProfile)}
@@ -520,8 +512,8 @@
 							<div class="flex items-center gap-3">
 								<Lock class="h-5 w-5 text-gray-500" />
 								<div>
-									<p class="font-medium text-gray-900 dark:text-white">Change Password</p>
-									<p class="text-sm text-gray-500 dark:text-gray-400">Update your password</p>
+									<p class="font-medium text-gray-900 dark:text-white">{$t.settings.changePassword}</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.changePasswordDesc}</p>
 								</div>
 							</div>
 							<Button variant="secondary" size="sm">Update</Button>
@@ -532,8 +524,8 @@
 							<div class="flex items-center gap-3">
 								<Download class="h-5 w-5 text-gray-500" />
 								<div>
-									<p class="font-medium text-gray-900 dark:text-white">Save Your Data</p>
-									<p class="text-sm text-gray-500 dark:text-gray-400">Download all your data</p>
+									<p class="font-medium text-gray-900 dark:text-white">{$t.settings.saveYourData}</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.saveYourDataDesc}</p>
 								</div>
 							</div>
 							<Button variant="secondary" size="sm">Download</Button>
@@ -544,10 +536,8 @@
 							<div class="flex items-center gap-3">
 								<Trash2 class="h-5 w-5 text-red-500" />
 								<div>
-									<p class="font-medium text-red-700 dark:text-red-400">Delete Account</p>
-									<p class="text-sm text-red-500 dark:text-red-400">
-										Permanently delete your account
-									</p>
+									<p class="font-medium text-red-700 dark:text-red-400">{$t.settings.deleteAccount}</p>
+									<p class="text-sm text-red-500 dark:text-red-400">{$t.settings.deleteAccountDesc}</p>
 								</div>
 							</div>
 							<Button variant="destructive" size="sm">Delete</Button>
@@ -559,7 +549,7 @@
 			<!-- Save Button -->
 			<Button class="w-full">
 				<Save class="mr-2 h-4 w-4" />
-				Save Changes
+				{$t.settings.saveChanges}
 			</Button>
 		</div>
 	</main>

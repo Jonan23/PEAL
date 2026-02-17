@@ -6,6 +6,7 @@
 	import Badge from '$lib/components/ui/badge.svelte';
 	import { Share2, Heart, MessageCircle, TrendingUp, Users, Globe, Sparkles } from 'lucide-svelte';
 	import { mockSuccessStories } from '$lib/data/mock';
+	import { t } from '$lib/i18n';
 
 	const stats = {
 		successStories: mockSuccessStories.length + 500,
@@ -28,16 +29,16 @@
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 					<div>
 						<h1 class="mb-2 text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">
-							Success Stories
+							{$t.success.title}
 						</h1>
 						<p class="text-gray-600 dark:text-gray-400">
-							Be inspired by incredible journeys from our community
+							{$t.success.subtitle}
 						</p>
 					</div>
 
 					<Button>
 						<Share2 class="mr-2 h-4 w-4" />
-						Share Success Story
+						{$t.success.shareStory}
 					</Button>
 				</div>
 			</div>
@@ -54,7 +55,7 @@
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">
 							{stats.successStories.toLocaleString()}+
 						</p>
-						<p class="text-sm text-gray-500">Success Stories</p>
+						<p class="text-sm text-gray-500">{$t.success.successStoriesCount}</p>
 					</div>
 				</Card>
 				<Card class="flex items-center gap-3 px-5 py-4">
@@ -67,7 +68,7 @@
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">
 							{stats.livesChanged.toLocaleString()}+
 						</p>
-						<p class="text-sm text-gray-500">Lives Changed</p>
+						<p class="text-sm text-gray-500">{$t.success.livesChanged}</p>
 					</div>
 				</Card>
 				<Card class="flex items-center gap-3 px-5 py-4">
@@ -80,7 +81,7 @@
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">
 							${(stats.economicImpact / 1000000).toFixed(1)}M+
 						</p>
-						<p class="text-sm text-gray-500">Economic Impact</p>
+						<p class="text-sm text-gray-500">{$t.success.economicImpact}</p>
 					</div>
 				</Card>
 			</div>
@@ -88,12 +89,12 @@
 			<!-- Featured Story -->
 			{#if mockSuccessStories[0]}
 				<Card class="mb-8 overflow-hidden">
-					<!-- Before/After Images -->
+					<!-- {$t.success.before}/{$t.success.after} Images -->
 					<div class="grid grid-cols-2 gap-1">
 						<div class="relative aspect-video">
 							<img
 								src={mockSuccessStories[0].beforeImage}
-								alt="Before"
+								alt="{$t.success.before}"
 								class="h-full w-full object-cover"
 							/>
 							<div class="absolute right-3 bottom-3 left-3">
@@ -104,13 +105,13 @@
 							<span
 								class="absolute top-3 left-3 rounded-lg bg-black/50 px-3 py-1 text-xs font-medium text-white"
 							>
-								Before
+								{$t.success.before}
 							</span>
 						</div>
 						<div class="relative aspect-video">
 							<img
 								src={mockSuccessStories[0].afterImage}
-								alt="After"
+								alt="{$t.success.after}"
 								class="h-full w-full object-cover"
 							/>
 							<div class="absolute right-3 bottom-3 left-3">
@@ -121,18 +122,18 @@
 							<span
 								class="absolute top-3 right-3 rounded-lg bg-rose-500 px-3 py-1 text-xs font-medium text-white"
 							>
-								After
+								{$t.success.after}
 							</span>
 						</div>
 					</div>
 
 					<div class="p-6">
 						<div class="mb-4 flex items-start justify-between">
-							<Badge>Featured Story</Badge>
+							<Badge>{$t.success.featuredStory}</Badge>
 							<span
 								class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
 							>
-								Completed
+								{$t.success.completed}
 							</span>
 						</div>
 
@@ -180,7 +181,7 @@
 							<div class="flex items-center gap-3">
 								<Button variant="secondary">
 									<Sparkles class="mr-2 h-4 w-4" />
-									Celebrate
+									{$t.success.celebrate}
 								</Button>
 								<Button variant="ghost">View Full Story</Button>
 							</div>
@@ -218,14 +219,14 @@
 			<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 				{#each mockSuccessStories.slice(1) as story (story.id)}
 					<Card class="overflow-hidden">
-						<!-- Before/After -->
+						<!-- {$t.success.before}/{$t.success.after} -->
 						<div class="grid grid-cols-2 gap-1">
 							<div class="relative aspect-video">
-								<img src={story.beforeImage} alt="Before" class="h-full w-full object-cover" />
+								<img src={story.beforeImage} alt="{$t.success.before}" class="h-full w-full object-cover" />
 								<span
 									class="absolute top-2 left-2 rounded bg-black/50 px-2 py-0.5 text-xs font-medium text-white"
 								>
-									Before
+									{$t.success.before}
 								</span>
 								<span
 									class="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white"
@@ -234,7 +235,7 @@
 								</span>
 							</div>
 							<div class="relative aspect-video">
-								<img src={story.afterImage} alt="After" class="h-full w-full object-cover" />
+								<img src={story.afterImage} alt="{$t.success.after}" class="h-full w-full object-cover" />
 								<span
 									class="absolute top-2 right-2 rounded bg-rose-500 px-2 py-0.5 text-xs font-medium text-white"
 								>
@@ -300,7 +301,7 @@
 							<div class="mt-3 flex gap-2">
 								<Button variant="secondary" size="sm" class="flex-1">
 									<Sparkles class="mr-1 h-3 w-3" />
-									Celebrate
+									{$t.success.celebrate}
 								</Button>
 								<Button variant="ghost" size="sm" class="flex-1">View Story</Button>
 							</div>

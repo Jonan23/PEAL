@@ -17,6 +17,7 @@
 		Share2
 	} from 'lucide-svelte';
 	import { mockFundingRequests } from '$lib/data/mock';
+	import { t } from '$lib/i18n';
 
 	let searchQuery = $state('');
 	let selectedCategory = $state('all');
@@ -58,14 +59,14 @@
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 					<div>
 						<h1 class="mb-2 text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">
-							Funding Requests
+							{$t.requests.title}
 						</h1>
-						<p class="text-gray-600 dark:text-gray-400">Support causes that matter to you</p>
+						<p class="text-gray-600 dark:text-gray-400">{$t.requests.subtitle}</p>
 					</div>
 
 					<Button>
 						<Plus class="mr-2 h-4 w-4" />
-						Create Request
+						{$t.requests.createRequest}
 					</Button>
 				</div>
 			</div>
@@ -80,7 +81,7 @@
 					</div>
 					<div>
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.activeRequests}</p>
-						<p class="text-sm text-gray-500">Active Requests</p>
+						<p class="text-sm text-gray-500">{$t.requests.activeRequests}</p>
 					</div>
 				</Card>
 				<Card class="flex items-center gap-3 px-4 py-3">
@@ -93,7 +94,7 @@
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">
 							${stats.raisedThisMonth.toLocaleString()}
 						</p>
-						<p class="text-sm text-gray-500">Raised This Month</p>
+						<p class="text-sm text-gray-500">{$t.requests.raisedThisMonth}</p>
 					</div>
 				</Card>
 				<Card class="flex items-center gap-3 px-4 py-3">
@@ -104,7 +105,7 @@
 					</div>
 					<div>
 						<p class="text-2xl font-bold text-gray-900 dark:text-white">{stats.successRate}%</p>
-						<p class="text-sm text-gray-500">Success Rate</p>
+						<p class="text-sm text-gray-500">{$t.requests.successRate}</p>
 					</div>
 				</Card>
 			</div>
@@ -114,7 +115,7 @@
 				<Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
 				<input
 					type="text"
-					placeholder="Search requests..."
+					placeholder={$t.requests.searchPlaceholder}
 					bind:value={searchQuery}
 					class="h-12 w-full rounded-xl border border-gray-200 bg-white pr-4 pl-10 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 				/>
@@ -171,17 +172,17 @@
 							<div class="mb-4 flex items-center justify-between text-sm">
 								<span class="font-semibold text-rose-500">
 									${request.currentAmount.toLocaleString()}
-									<span class="font-normal text-gray-500 dark:text-gray-400">raised</span>
+									<span class="font-normal text-gray-500 dark:text-gray-400">{$t.requests.raised}</span>
 								</span>
 								<span class="text-gray-500 dark:text-gray-400">
-									${request.goalAmount.toLocaleString()} goal
+									${request.goalAmount.toLocaleString()} {$t.requests.goal}
 								</span>
 							</div>
 
 							<div class="mb-4 flex items-center justify-between text-sm">
 								<span class="flex items-center gap-1">
 									<Users class="h-4 w-4" />
-									{request.supporters} supporters
+									{request.supporters} {$t.requests.supportersCount}
 								</span>
 								<span class="flex items-center gap-1">
 									{calculateProgress(request.currentAmount, request.goalAmount)}% funded
@@ -206,7 +207,7 @@
 
 							<Button class="w-full">
 								<Heart class="mr-2 h-4 w-4" />
-								Support This Project
+								{$t.requests.donate}
 							</Button>
 						</div>
 					</Card>

@@ -7,6 +7,7 @@
 	import VideoThumbnail from '$lib/components/video-thumbnail.svelte';
 	import { TrendingUp, Target, Calendar, ArrowRight } from 'lucide-svelte';
 	import { mockUsers, mockVideos, mockFundingRequests } from '$lib/data/mock';
+	import { t } from '$lib/i18n';
 
 	const currentUser = mockUsers[0];
 	const trendingVideos = mockVideos.slice(0, 4);
@@ -25,10 +26,10 @@
 			<!-- Welcome Section -->
 			<div class="mb-8">
 				<h1 class="mb-2 text-2xl font-bold text-gray-900 lg:text-3xl dark:text-white">
-					Welcome back, {currentUser.name.split(' ')[0]}!
+					{$t.dashboard.welcomeUser.replace('{name}', currentUser.name.split(' ')[0])}
 				</h1>
 				<p class="text-gray-600 dark:text-gray-400">
-					Here's what's happening in your community today.
+					{$t.dashboard.communityMessage}
 				</p>
 			</div>
 
@@ -43,7 +44,7 @@
 						</div>
 						<div>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">2.5K</p>
-							<p class="text-xs text-gray-500 dark:text-gray-400">Video Views</p>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{$t.dashboard.videoViews}</p>
 						</div>
 					</div>
 				</Card>
@@ -56,7 +57,7 @@
 						</div>
 						<div>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">3</p>
-							<p class="text-xs text-gray-500 dark:text-gray-400">Active Goals</p>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{$t.dashboard.activeGoals}</p>
 						</div>
 					</div>
 				</Card>
@@ -81,7 +82,7 @@
 						</div>
 						<div>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">89</p>
-							<p class="text-xs text-gray-500 dark:text-gray-400">Supporters</p>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{$t.dashboard.supporters}</p>
 						</div>
 					</div>
 				</Card>
@@ -94,7 +95,7 @@
 						</div>
 						<div>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">2</p>
-							<p class="text-xs text-gray-500 dark:text-gray-400">Events</p>
+							<p class="text-xs text-gray-500 dark:text-gray-400">{$t.dashboard.events}</p>
 						</div>
 					</div>
 				</Card>
@@ -103,12 +104,12 @@
 			<!-- Your Goals -->
 			<section class="mb-8">
 				<div class="mb-4 flex items-center justify-between">
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Your Goals</h2>
+					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">{$t.dashboard.yourGoals}</h2>
 					<a
 						href="/goals"
 						class="flex items-center gap-1 text-sm text-rose-500 hover:text-rose-600"
 					>
-						View all <ArrowRight class="h-4 w-4" />
+						{$t.common.viewAll} <ArrowRight class="h-4 w-4" />
 					</a>
 				</div>
 				<div class="grid gap-4 md:grid-cols-2">
@@ -145,9 +146,9 @@
 			<!-- Trending Videos -->
 			<section class="mb-8">
 				<div class="mb-4 flex items-center justify-between">
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Trending Now</h2>
+					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">{$t.dashboard.trending}</h2>
 					<a href="/feed" class="flex items-center gap-1 text-sm text-rose-500 hover:text-rose-600">
-						View all <ArrowRight class="h-4 w-4" />
+						{$t.common.viewAll} <ArrowRight class="h-4 w-4" />
 					</a>
 				</div>
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -160,12 +161,12 @@
 			<!-- Upcoming Events -->
 			<section>
 				<div class="mb-4 flex items-center justify-between">
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Upcoming Events</h2>
+					<h2 class="text-xl font-semibold text-gray-900 dark:text-white">{$t.dashboard.upcomingEvents}</h2>
 					<a
 						href="/events"
 						class="flex items-center gap-1 text-sm text-rose-500 hover:text-rose-600"
 					>
-						View all <ArrowRight class="h-4 w-4" />
+						{$t.common.viewAll} <ArrowRight class="h-4 w-4" />
 					</a>
 				</div>
 				<Card class="p-4">
@@ -181,7 +182,7 @@
 								<h3 class="font-medium text-gray-900 dark:text-white">Women's Leadership Summit</h3>
 								<p class="text-sm text-gray-500">2:00 PM - Virtual Event</p>
 							</div>
-							<Button size="sm">Join</Button>
+							<Button size="sm">{$t.common.join}</Button>
 						</div>
 						<div class="flex items-center gap-4 rounded-xl bg-gray-50 p-3 dark:bg-gray-800">
 							<div
@@ -194,7 +195,7 @@
 								<h3 class="font-medium text-gray-900 dark:text-white">Mentor Matching Session</h3>
 								<p class="text-sm text-gray-500">4:00 PM - Virtual Event</p>
 							</div>
-							<Button size="sm" variant="secondary">Register</Button>
+							<Button size="sm" variant="secondary">{$t.common.registerBtn}</Button>
 						</div>
 					</div>
 				</Card>

@@ -16,22 +16,23 @@
 	import Avatar from './ui/avatar.svelte';
 	import ThemeToggle from './theme-toggle.svelte';
 	import { mockUsers } from '$lib/data/mock';
+	import { t } from '$lib/i18n';
 
 	const currentUser = mockUsers[0];
 
-	const navItems = [
-		{ href: '/dashboard', icon: Home, label: 'Home' },
-		{ href: '/feed', icon: Video, label: 'Feed' },
-		{ href: '/mentor-match', icon: Users, label: 'Mentors' },
-		{ href: '/requests', icon: Heart, label: 'Requests' },
-		{ href: '/success', icon: Star, label: 'Success' }
-	];
+	const navItems = $derived([
+		{ href: '/dashboard', icon: Home, label: $t.common.home },
+		{ href: '/feed', icon: Video, label: $t.common.feed },
+		{ href: '/mentor-match', icon: Users, label: $t.common.mentors },
+		{ href: '/requests', icon: Heart, label: $t.common.requests },
+		{ href: '/success', icon: Star, label: $t.common.success }
+	]);
 
-	const quickActions = [
-		{ href: '/requests/new', icon: PlusCircle, label: 'Create Request' },
-		{ href: '/feed/upload', icon: Upload, label: 'Share Video' },
-		{ href: '/messages', icon: MessageCircle, label: 'Messages' }
-	];
+	const quickActions = $derived([
+		{ href: '/requests/new', icon: PlusCircle, label: $t.nav.createRequest },
+		{ href: '/feed/upload', icon: Upload, label: $t.nav.shareVideo },
+		{ href: '/messages', icon: MessageCircle, label: $t.nav.messages }
+	]);
 
 	function isActive(href: string, pathname: string): boolean {
 		return pathname === href || pathname.startsWith(href + '/');
@@ -117,7 +118,7 @@
 				class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
 			>
 				<Settings class="h-5 w-5" />
-				<span class="font-medium">Settings</span>
+				<span class="font-medium">{$t.common.settings}</span>
 			</a>
 			<ThemeToggle />
 		</div>
@@ -146,12 +147,6 @@
 				class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
 			>
 				<Search class="h-5 w-5 text-gray-600 dark:text-gray-400" />
-			</button>
-			<button
-				class="relative flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
-			>
-				<Bell class="h-5 w-5 text-gray-600 dark:text-gray-400" />
-				<span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-rose-500"></span>
 			</button>
 			<ThemeToggle />
 			<a href="/profile/settings" class="h-10 w-10">

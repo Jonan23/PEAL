@@ -4,6 +4,7 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Avatar from '$lib/components/ui/avatar.svelte';
+	import { t } from '$lib/i18n';
 
 	let step = $state(1);
 	let loading = $state(false);
@@ -67,9 +68,9 @@
 			<h1
 				class="bg-gradient-to-r from-rose-500 to-orange-500 bg-clip-text text-3xl font-bold text-transparent"
 			>
-				Create Account
+				{$t.auth.createAccount}
 			</h1>
-			<p class="mt-2 text-gray-600 dark:text-gray-400">Step {step} of 3</p>
+			<p class="mt-2 text-gray-600 dark:text-gray-400">{$t.auth.stepOf.replace('{current}', step.toString()).replace('{total}', '3')}</p>
 		</div>
 
 		<!-- Progress -->
@@ -90,14 +91,14 @@
 				<div class="space-y-4">
 					<Input
 						type="email"
-						label="Email"
+						label={$t.auth.email}
 						placeholder="you@example.com"
 						bind:value={formData.email}
 						required
 					/>
 					<Input
 						type="password"
-						label="Password"
+						label={$t.auth.password}
 						placeholder="Create a password"
 						bind:value={formData.password}
 						required
@@ -107,15 +108,15 @@
 				<!-- Step 2: Personal Details -->
 				<div class="space-y-4">
 					<Input
-						label="Full Name"
+						label={$t.auth.fullName}
 						placeholder="Your full name"
 						bind:value={formData.name}
 						required
 					/>
-					<Input label="Location" placeholder="City, Country" bind:value={formData.location} />
+					<Input label={$t.auth.location} placeholder="City, Country" bind:value={formData.location} />
 					<div>
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>I am a...</label
+							>{$t.auth.iAmA}</label
 						>
 						<div class="grid grid-cols-2 gap-3">
 							<button
@@ -126,7 +127,7 @@
 									: 'border-gray-200 dark:border-gray-700'}"
 							>
 								<span class="mb-2 block text-2xl">👩</span>
-								<span class="font-medium">Woman</span>
+								<span class="font-medium">{$t.auth.woman}</span>
 							</button>
 							<button
 								type="button"
@@ -136,14 +137,14 @@
 									: 'border-gray-200 dark:border-gray-700'}"
 							>
 								<span class="mb-2 block text-2xl">🤝</span>
-								<span class="font-medium">Sponsor</span>
+								<span class="font-medium">{$t.auth.sponsor}</span>
 							</button>
 						</div>
 					</div>
 					{#if formData.role}
 						<div>
 							<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-								>Select your skills (up to 3)</label
+								>{$t.auth.selectSkills}</label
 							>
 							<div class="flex flex-wrap gap-2">
 								{#each skillOptions as skill}
@@ -172,20 +173,20 @@
 				<div class="space-y-4">
 					<div>
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>Profile Photo</label
+							>{$t.auth.profilePhoto}</label
 						>
 						<div class="flex items-center gap-4">
 							<Avatar src="" alt="Profile" size="xl" />
-							<Button variant="secondary" size="sm">Upload Photo</Button>
+							<Button variant="secondary" size="sm">{$t.auth.uploadPhoto}</Button>
 						</div>
 					</div>
 					<div>
 						<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-							>Bio</label
+							>{$t.auth.bio}</label
 						>
 						<textarea
 							bind:value={formData.bio}
-							placeholder="Tell us about yourself..."
+							placeholder={$t.auth.bioPlaceholder}
 							rows="4"
 							class="flex w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 						></textarea>
@@ -197,7 +198,7 @@
 							required
 						/>
 						<span class="text-gray-600 dark:text-gray-400"
-							>I agree to the Terms of Service and Privacy Policy</span
+							>{$t.auth.agreeTerms}</span
 						>
 					</label>
 				</div>
@@ -207,14 +208,14 @@
 				{#if step > 1}
 					<Button variant="ghost" onclick={() => step--} class="flex-1">
 						<ArrowLeft class="mr-2 h-4 w-4" />
-						Back
+						{$t.common.back}
 					</Button>
 				{/if}
 				<Button onclick={handleNext} class="flex-1" disabled={loading}>
 					{#if loading}
-						Creating account...
+						{$t.auth.creatingAccount}
 					{:else}
-						{step === 3 ? 'Create Account' : 'Continue'}
+						{step === 3 ? $t.auth.createAccount : $t.common.continue}
 						<ArrowRight class="ml-2 h-4 w-4" />
 					{/if}
 				</Button>
@@ -223,8 +224,8 @@
 
 		<!-- Sign In Link -->
 		<p class="mt-6 text-center text-gray-600 dark:text-gray-400">
-			Already have an account?
-			<a href="/login" class="font-medium text-rose-500 hover:text-rose-600">Sign in</a>
+			{$t.auth.haveAccount}
+			<a href="/login" class="font-medium text-rose-500 hover:text-rose-600">{$t.auth.signIn}</a>
 		</p>
 	</div>
 </div>
