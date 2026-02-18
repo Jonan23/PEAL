@@ -1,4 +1,5 @@
 import type { Context, Next } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export interface AppError extends Error {
   status?: number;
@@ -16,7 +17,7 @@ export async function errorMiddleware(c: Context, next: Next) {
         error: error.message || "Internal Server Error",
         ...(Bun.env.NODE_ENV === "development" && { stack: error.stack }),
       },
-      error.status || 500,
+      (error.status || 500) as ContentfulStatusCode,
     );
   }
 }

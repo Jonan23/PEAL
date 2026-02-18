@@ -1,13 +1,16 @@
 import { Hono } from "hono";
 import { prisma } from "../config/database.js";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, getUser } from "../middleware/auth.js";
 
 export const moderation = new Hono();
 
 moderation.use("*", authMiddleware);
 
 moderation.post("/report", async (c) => {
-  const userId = c.get("userId");
+  const user = getUser(c);
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const body = await c.req.json();
   const { contentType, contentId, reason, description } = body;
 
@@ -31,7 +34,7 @@ moderation.post("/report", async (c) => {
 
   const existingReport = await prisma.moderationReport.findFirst({
     where: {
-      reporterId: userId,
+      reporterId: user.userId,
       contentType,
       contentId,
       status: "pending",
@@ -44,7 +47,7 @@ moderation.post("/report", async (c) => {
 
   const report = await prisma.moderationReport.create({
     data: {
-      reporterId: userId,
+      reporterId: user.userId,
       contentType,
       contentId,
       reason,
@@ -56,10 +59,13 @@ moderation.post("/report", async (c) => {
 });
 
 moderation.get("/my-reports", async (c) => {
-  const userId = c.get("userId");
+  const user = getUser(c);
+  if (!user) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
 
   const reports = await prisma.moderationReport.findMany({
-    where: { reporterId: userId },
+    where: { reporterId: user.userId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -67,9 +73,8 @@ moderation.get("/my-reports", async (c) => {
 });
 
 moderation.get("/pending", async (c) => {
-  const user = c.get("user");
-
-  if (user.role !== "admin") {
+  const user = getUser(c);
+  if (!user || user.role !== "admin") {
     return c.json({ error: "Admin access required" }, 403);
   }
 
@@ -82,12 +87,12 @@ moderation.get("/pending", async (c) => {
 });
 
 moderation.post("/:id/review", async (c) => {
-  const user = c.get("user");
+  const user = getUser(c);
   const reportId = c.req.param("id");
   const body = await c.req.json();
   const { action } = body;
 
-  if (user.role !== "admin") {
+  if (!user || user.role !== "admin") {
     return c.json({ error: "Admin access required" }, 403);
   }
 
@@ -136,7 +141,7 @@ moderation.post("/:id/review", async (c) => {
     where: { id: reportId },
     data: {
       status: "reviewed",
-      reviewedBy: user.id,
+      reviewedBy: user.userId,
       reviewedAt: new Date(),
       action,
     },
@@ -146,9 +151,8 @@ moderation.post("/:id/review", async (c) => {
 });
 
 moderation.get("/stats", async (c) => {
-  const user = c.get("user");
-
-  if (user.role !== "admin") {
+  const user = getUser(c);
+  if (!user || user.role !== "admin") {
     return c.json({ error: "Admin access required" }, 403);
   }
 

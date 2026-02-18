@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import { prisma } from "../config/database.js";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, getUser } from "../middleware/auth.js";
 
 export const admin = new Hono();
 
 admin.use("*", authMiddleware);
 
 admin.use("*", async (c, next) => {
-  const user = c.get("user");
+  const user = getUser(c);
   if (!user || user.role !== "admin") {
     return c.json({ error: "Admin access required" }, 403);
   }

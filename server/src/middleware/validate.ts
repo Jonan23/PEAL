@@ -1,9 +1,11 @@
 import type { Context, Next } from "hono";
 import { z, ZodSchema } from "zod";
 
+type InferZod<T extends ZodSchema> = z.infer<T>;
+
 declare module "hono" {
   interface ContextVariableMap {
-    validatedBody?: unknown;
+    validatedBody: unknown;
   }
 }
 
@@ -22,9 +24,13 @@ export function validate<T extends ZodSchema>(schema: T) {
       );
     }
 
-    c.set("validatedBody", result.data);
+    c.set("validatedBody", result.data as InferZod<T>);
     await next();
   };
+}
+
+export function getValidatedBody<T>(c: Context): T {
+  return c.get("validatedBody") as T;
 }
 
 export const registerSchema = z.object({
@@ -43,6 +49,6 @@ export const updateUserSchema = z.object({
   name: z.string().min(2).optional(),
   bio: z.string().optional(),
   location: z.string().optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: z.string().url().optional().nullable(),
   isPublic: z.boolean().optional(),
 });

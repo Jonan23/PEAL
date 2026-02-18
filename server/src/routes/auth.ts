@@ -10,6 +10,7 @@ import {
   validate,
   registerSchema,
   loginSchema,
+  getValidatedBody,
 } from "../middleware/validate.js";
 import { authRateLimit } from "../middleware/rate-limit.js";
 import { sendWelcomeEmail } from "../services/email.js";
@@ -18,7 +19,12 @@ import bcrypt from "bcrypt";
 export const auth = new Hono();
 
 auth.post("/register", authRateLimit, validate(registerSchema), async (c) => {
-  const body = c.get("validatedBody");
+  const body = getValidatedBody<{
+    email: string;
+    password: string;
+    name: string;
+    role: string;
+  }>(c);
   const { email, password, name, role } = body;
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -68,7 +74,7 @@ auth.post("/register", authRateLimit, validate(registerSchema), async (c) => {
 });
 
 auth.post("/login", authRateLimit, validate(loginSchema), async (c) => {
-  const body = c.get("validatedBody");
+  const body = getValidatedBody<{ email: string; password: string }>(c);
   const { email, password } = body;
 
   const user = await prisma.user.findUnique({ where: { email } });

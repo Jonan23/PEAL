@@ -1,24 +1,20 @@
-import { createServer } from "http";
 import { Server } from "socket.io";
 import { verifyAccessToken } from "../config/auth.js";
 
-interface UserSocket {
-  userId: string;
-  socketId: string;
-}
-
 const connectedUsers = new Map<string, Set<string>>();
 
-export function createWebSocketServer(port: number) {
-  const io = new Server(port, {
+let io: Server | null = null;
+
+export function createWebSocketServer(port: number): Server {
+  const server = new Server(port, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"],
     },
   });
 
-  io.use(async (socket, next) => {
-    const token = socket.handshake.auth.token;
+  server.use(async (socket, next) => {
+    const token = socket.handshake.auth.token as string | undefined;
     if (!token) {
       return next(new Error("Authentication required"));
     }
@@ -32,8 +28,8 @@ export function createWebSocketServer(port: number) {
     }
   });
 
-  io.on("connection", (socket) => {
-    const userId = socket.data.userId;
+  server.on("connection", (socket) => {
+    const userId = socket.data.userId as string;
 
     if (!connectedUsers.has(userId)) {
       connectedUsers.set(userId, new Set());
@@ -72,14 +68,14 @@ export function createWebSocketServer(port: number) {
     });
   });
 
-  return io;
+  return server;
 }
 
 export function emitToUser(userId: string, event: string, data: unknown) {
   const userSockets = connectedUsers.get(userId);
-  if (userSockets) {
+  if (userSockets && io) {
     for (const socketId of userSockets) {
-      io?.to(socketId).emit(event, data);
+      io.to(socketId).emit(event, data);
     }
   }
 }
@@ -89,16 +85,16 @@ export function emitToConversation(
   event: string,
   data: unknown,
 ) {
-  io?.to(`conversation:${conversationId}`).emit(event, data);
+  if (io) {
+    io.to(`conversation:${conversationId}`).emit(event, data);
+  }
 }
 
-let io: Server | null = null;
-
-export function getIO() {
+export function getIO(): Server | null {
   return io;
 }
 
-export function initWebSocket(port: number) {
+export function initWebSocket(port: number): Server {
   io = createWebSocketServer(port);
   console.log(`WebSocket server running on port ${port}`);
   return io;

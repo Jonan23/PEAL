@@ -170,22 +170,24 @@ messages.post("/", authMiddleware, async (c) => {
     },
   });
 
-  if (!conversation) {
-    conversation = await prisma.conversation.create({
+  let conversationId: string;
+
+  if (conversation) {
+    conversationId = conversation.conversation.id;
+  } else {
+    const newConversation = await prisma.conversation.create({
       data: {
         participants: {
           create: [{ userId: user.userId }, { userId: recipientId }],
         },
       },
-      include: {
-        conversation: true,
-      },
     });
+    conversationId = newConversation.id;
   }
 
   const message = await prisma.message.create({
     data: {
-      conversationId: conversation.conversation.id,
+      conversationId,
       senderId: user.userId,
       content,
     },
@@ -202,7 +204,7 @@ messages.post("/", authMiddleware, async (c) => {
 
   await prisma.conversationParticipant.updateMany({
     where: {
-      conversationId: conversation.conversation.id,
+      conversationId,
       userId: { not: user.userId },
     },
     data: {
@@ -218,13 +220,13 @@ messages.post("/", authMiddleware, async (c) => {
       title: "New Message",
       message: `You have a new message from ${user.userId}`,
       data: {
-        conversationId: conversation.conversation.id,
+        conversationId,
         messageId: message.id,
       },
     },
   });
 
-  return c.json({ message, conversationId: conversation.conversation.id }, 201);
+  return c.json({ message, conversationId }, 201);
 });
 
 messages.post("/:id/messages", authMiddleware, async (c) => {

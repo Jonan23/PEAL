@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { prisma } from "../config/database.js";
 import { authMiddleware, getUser } from "../middleware/auth.js";
-import { validate, updateUserSchema } from "../middleware/validate.js";
+import {
+  validate,
+  updateUserSchema,
+  getValidatedBody,
+} from "../middleware/validate.js";
 
 export const users = new Hono();
 
@@ -79,11 +83,23 @@ users.put("/:id", authMiddleware, validate(updateUserSchema), async (c) => {
     return c.json({ error: "Unauthorized" }, 403);
   }
 
-  const body = c.get("validatedBody");
+  const body = getValidatedBody<{
+    name?: string;
+    bio?: string;
+    location?: string;
+    avatarUrl?: string | null;
+    isPublic?: boolean;
+  }>(c);
 
   const user = await prisma.user.update({
     where: { id },
-    data: body,
+    data: {
+      name: body.name,
+      bio: body.bio,
+      location: body.location,
+      avatarUrl: body.avatarUrl ?? undefined,
+      isPublic: body.isPublic,
+    },
     select: {
       id: true,
       email: true,
