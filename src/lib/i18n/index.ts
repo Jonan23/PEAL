@@ -29,7 +29,10 @@ function createLanguageStore() {
 
 export const language = createLanguageStore();
 
-export const t = derived(language, ($language) => translations[$language]);
+export const t = derived(
+  language,
+  ($language) => translations[$language] as TranslationKeys,
+);
 
 export const isRTL = derived(language, ($language) => $language === "ar");
 

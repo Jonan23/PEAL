@@ -5,9 +5,11 @@
 	import Input from '$lib/components/ui/input.svelte';
 	import Avatar from '$lib/components/ui/avatar.svelte';
 	import { t } from '$lib/i18n';
+	import { authStore } from '$lib/stores/auth';
 
 	let step = $state(1);
 	let loading = $state(false);
+	let error = $state('');
 
 	let formData = $state({
 		email: '',
@@ -40,12 +42,29 @@
 	}
 
 	async function handleNext() {
+		error = '';
+		
 		if (step < 3) {
 			step++;
 		} else {
 			loading = true;
-			await new Promise((r) => setTimeout(r, 1000));
-			goto('/onboarding');
+			
+			const result = await authStore.register({
+				email: formData.email,
+				password: formData.password,
+				name: formData.name,
+				role: formData.role,
+				skills: formData.skills,
+				bio: formData.bio,
+				location: formData.location
+			});
+
+			if (result.success) {
+				goto('/onboarding');
+			} else {
+				error = result.error || 'Registration failed';
+				loading = false;
+			}
 		}
 	}
 </script>
@@ -86,6 +105,12 @@
 
 		<!-- Form Card -->
 		<div class="card p-6">
+			{#if error}
+				<div class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+					{error}
+				</div>
+			{/if}
+			
 			{#if step === 1}
 				<!-- Step 1: Email & Password -->
 				<div class="space-y-4">

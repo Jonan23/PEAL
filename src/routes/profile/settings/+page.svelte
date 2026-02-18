@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Button from '$lib/components/ui/button.svelte';
@@ -6,13 +7,16 @@
 	import { theme } from '$lib/stores/theme';
 	import { language, availableLanguages, t } from '$lib/i18n';
 	import { type Language } from '$lib/i18n/translations';
+	import { authStore } from '$lib/stores/auth';
+	import { settingsApi, usersApi } from '$lib/api';
+	import type { User, UserSettings } from '$lib/api/types';
 	import {
 		Save,
 		Moon,
 		Sun,
 		Bell,
 		Shield,
-		User,
+		User as UserIcon,
 		X,
 		Users,
 		Heart,
@@ -22,9 +26,11 @@
 		Lock,
 		AlertTriangle
 	} from 'lucide-svelte';
-	import { mockUsers } from '$lib/data/mock';
 
-	const currentUser = mockUsers[0];
+	let currentUser = $state<User | null>(null);
+	let settings = $state<UserSettings | null>(null);
+	let loading = $state(true);
+	let saving = $state(false);
 
 	let selectedTheme = $state('light');
 	let selectedLanguage = $state<Language>('en');
@@ -35,8 +41,12 @@
 	let weeklyDigest = $state(false);
 	let publicProfile = $state(true);
 
-	let userSkills = $state(['Leadership', 'Technology', 'Marketing']);
-	let userInterests = $state(['Entrepreneurship', 'Education', 'Healthcare']);
+	let name = $state('');
+	let email = $state('');
+	let location = $state('');
+	let bio = $state('');
+	let userSkills = $state<string[]>([]);
+	let userInterests = $state<string[]>([]);
 	let newSkill = $state('');
 	let newInterest = $state('');
 
@@ -63,11 +73,11 @@
 		'Social Impact'
 	];
 
-	const impactStats = {
+	const impactStats = $derived({
 		supporters: 89,
 		mentors: 5,
 		raised: 12500
-	};
+	});
 
 	theme.subscribe((value) => {
 		selectedTheme = value;
@@ -75,6 +85,37 @@
 
 	language.subscribe((value) => {
 		selectedLanguage = value;
+	});
+
+	onMount(async () => {
+		await authStore.initialize();
+		currentUser = $authStore.user;
+
+		if (currentUser) {
+			name = currentUser.name || '';
+			email = currentUser.email || '';
+			location = currentUser.location || '';
+			bio = currentUser.bio || '';
+		}
+
+		try {
+			const settingsResponse = await settingsApi.get();
+			settings = settingsResponse.settings;
+
+			if (settings) {
+				emailNotifications = settings.emailNotifications;
+				pushNotifications = settings.pushNotifications;
+				mentorMessages = settings.mentorMessagesNotifications;
+				supporterUpdates = settings.supporterUpdatesNotifications;
+				weeklyDigest = settings.weeklyDigest;
+				selectedLanguage = settings.language as Language;
+				selectedTheme = settings.theme;
+			}
+		} catch (error) {
+			console.error('Failed to load settings:', error);
+		} finally {
+			loading = false;
+		}
 	});
 
 	function setTheme(newTheme: 'light' | 'dark') {
@@ -106,6 +147,37 @@
 	function removeInterest(interest: string) {
 		userInterests = userInterests.filter((i) => i !== interest);
 	}
+
+	async function handleSave() {
+		if (!currentUser) return;
+
+		saving = true;
+		try {
+			await Promise.all([
+				usersApi.update(currentUser.id, {
+					name,
+					email,
+					location,
+					bio
+				}),
+				settingsApi.update({
+					emailNotifications,
+					pushNotifications,
+					mentorMessagesNotifications: mentorMessages,
+					supporterUpdatesNotifications: supporterUpdates,
+					weeklyDigest,
+					language: selectedLanguage,
+					theme: selectedTheme
+				})
+			]);
+
+			await authStore.refreshUser();
+		} catch (error) {
+			console.error('Failed to save settings:', error);
+		} finally {
+			saving = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -124,12 +196,12 @@
 				<h2
 					class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
 				>
-					<User class="h-5 w-5" />
+					<UserIcon class="h-5 w-5" />
 					{$t.settings.profile}
 				</h2>
 				<Card class="p-5">
 					<div class="mb-6 flex items-start gap-4">
-						<Avatar src={currentUser.avatar} alt={currentUser.name} size="xl" />
+						<Avatar src={currentUser?.avatarUrl} alt={currentUser?.name || 'User'} size="xl" />
 						<div class="flex-1">
 							<Button variant="secondary" size="sm">{$t.settings.changePhoto}</Button>
 							<p class="mt-2 text-xs text-gray-500">{$t.settings.photoHint}</p>
@@ -142,7 +214,7 @@
 							>
 							<input
 								type="text"
-								value={currentUser.name}
+								bind:value={name}
 								class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 							/>
 						</div>
@@ -152,7 +224,7 @@
 							>
 							<input
 								type="email"
-								value={currentUser.email}
+								bind:value={email}
 								class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 							/>
 						</div>
@@ -162,8 +234,8 @@
 							>
 							<input
 								type="text"
-								value={currentUser.location || ''}
-								placeholder={$t.settings.locationPlaceholder || 'City, Country'}
+								bind:value={location}
+								placeholder="City, Country"
 								class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 							/>
 						</div>
@@ -172,7 +244,7 @@
 								>{$t.settings.bio}</label
 							>
 							<textarea
-								value={currentUser.bio || ''}
+								bind:value={bio}
 								placeholder={$t.settings.bioPlaceholder || 'Tell us about yourself...'}
 								rows="3"
 								class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
@@ -446,7 +518,7 @@
 							<div
 								class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"
 							>
-								<User class="h-6 w-6 text-violet-500" />
+								<UserIcon class="h-6 w-6 text-violet-500" />
 							</div>
 							<p class="text-2xl font-bold text-gray-900 dark:text-white">{impactStats.mentors}</p>
 							<p class="text-sm text-gray-500 dark:text-gray-400">Mentors</p>
@@ -547,9 +619,9 @@
 			</section>
 
 			<!-- Save Button -->
-			<Button class="w-full">
+			<Button class="w-full" onclick={handleSave} disabled={saving}>
 				<Save class="mr-2 h-4 w-4" />
-				{$t.settings.saveChanges}
+				{saving ? 'Saving...' : $t.settings.saveChanges}
 			</Button>
 		</div>
 	</main>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Button from '$lib/components/ui/button.svelte';
@@ -11,13 +12,21 @@
 		MessageCircle,
 		Briefcase,
 		Calendar,
-		SlidersHorizontal
+		SlidersHorizontal,
+		Star,
+		Sparkles
 	} from 'lucide-svelte';
-	import { mockMentors } from '$lib/data/mock';
 	import { t } from '$lib/i18n';
+	import { mentorsApi, matchingApi } from '$lib/api/endpoints';
+	import { authStore } from '$lib/stores/auth';
+	import type { Mentor, MentorMatch } from '$lib/api/types';
 
+	let mentors = $state<Mentor[]>([]);
+	let recommendedMentors = $state<MentorMatch[]>([]);
+	let loading = $state(true);
 	let searchQuery = $state('');
 	let selectedSkill = $state('all');
+	let showRecommended = $state(true);
 
 	const skills = [
 		'Technology',
@@ -33,21 +42,41 @@
 		'Entrepreneurship'
 	];
 
+	onMount(async () => {
+		await authStore.initialize();
+		const userId = $authStore.user?.id;
+
+		try {
+			const [mentorsRes, matchesRes] = await Promise.all([
+				mentorsApi.getAll(),
+				userId ? matchingApi.getRecommendations(userId) : Promise.resolve({ matches: [] })
+			]);
+			mentors = mentorsRes.mentors;
+			recommendedMentors = matchesRes.matches;
+		} catch (error) {
+			console.error('Failed to load mentors:', error);
+		} finally {
+			loading = false;
+		}
+	});
+
 	const filteredMentors = $derived(
-		mockMentors
-			.map((mentor) => ({
-				...mentor,
-				yearsExperience: Math.floor(Math.random() * 10) + 1,
-				menteesCount: Math.floor(Math.random() * 50) + 10
-			}))
-			.filter((mentor) => {
-				const matchesSearch =
-					mentor.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					mentor.skills.some((skill) => skill.toLowerCase().includes(searchQuery.toLowerCase()));
-				const matchesSkill = selectedSkill === 'all' || mentor.skills.includes(selectedSkill);
-				return matchesSearch && matchesSkill;
-			})
+		mentors.filter((mentor) => {
+			const matchesSearch =
+				(mentor.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+				(mentor.skills && mentor.skills.some((skill) => skill.toLowerCase().includes(searchQuery.toLowerCase())));
+			const matchesSkill = selectedSkill === 'all' || (mentor.skills && mentor.skills.includes(selectedSkill));
+			return matchesSearch && matchesSkill;
+		})
 	);
+
+	async function handleConnect(mentorId: string) {
+		try {
+			await mentorsApi.connect(mentorId);
+		} catch (error) {
+			console.error('Failed to connect:', error);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -107,100 +136,158 @@
 			</div>
 
 			<!-- Mentors List -->
-			<div class="space-y-4">
-				{#each filteredMentors as mentor (mentor.id)}
-					<div class="flex gap-4">
-						<!-- Connect Button on Left -->
-						<div class="hidden lg:flex lg:flex-col lg:justify-center">
-							<Button size="sm">{$t.mentors.connect}</Button>
-						</div>
-
-						<Card class="flex-1 p-4">
-							<!-- Status Indicator & Comment Icon -->
-							<div class="mb-3 flex items-start justify-between">
-								<div class="flex items-center gap-2">
-									{#if mentor.availability === 'available'}
-										<span
-											class="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-										>
-											<span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-											Available
-										</span>
-									{:else}
-										<span
-											class="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
-										>
-											<span class="h-2 w-2 rounded-full bg-red-500"></span>
-											Unavailable
-										</span>
-									{/if}
-								</div>
-								<button class="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
-									<MessageCircle class="h-5 w-5 text-gray-400" />
-								</button>
-							</div>
-
-							<div class="flex gap-4">
-								<!-- Avatar with status dot -->
-								<div class="relative">
-									<Avatar src={mentor.user.avatar} alt={mentor.user.name} size="xl" />
-									<span
-										class="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-white {mentor.availability ===
-										'available'
-											? 'bg-emerald-500'
-											: 'bg-red-500'} dark:border-gray-900"
-									></span>
-								</div>
-
-								<div class="flex-1">
-									<!-- Name & Bio -->
-									<h3 class="font-semibold text-gray-900 dark:text-white">{mentor.user.name}</h3>
-									<p class="text-sm text-gray-500 dark:text-gray-400">{mentor.user.bio}</p>
-
-									<!-- Skills -->
-									<div class="mt-2 flex flex-wrap gap-1.5">
-										{#each mentor.skills as skill}
-											<Badge variant="secondary">{skill}</Badge>
-										{/each}
-									</div>
-
-									<!-- Stats: Mentees, Experience, Years -->
-									<div
-										class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400"
-									>
-										<span class="flex items-center gap-1">
-											<Users class="h-4 w-4" />
-											{mentor.menteesCount} mentees
-										</span>
-										<span class="flex items-center gap-1">
-											<Briefcase class="h-4 w-4" />
-											{mentor.yearsExperience} years exp
-										</span>
-										<span class="flex items-center gap-1">
-											<Calendar class="h-4 w-4" />
-											{mentor.yearsExperience}+ years
-										</span>
-										<span class="flex items-center gap-1">
-											<MapPin class="h-4 w-4" />
-											{mentor.user.location || 'Remote'}
-										</span>
-									</div>
-								</div>
-							</div>
-
-							<!-- Mobile Connect Button -->
-							<div class="mt-4 lg:hidden">
-								<Button class="w-full">{$t.mentors.connect}</Button>
-							</div>
-						</Card>
-					</div>
-				{/each}
-			</div>
-
-			{#if filteredMentors.length === 0}
-				<div class="py-12 text-center">
-					<p class="text-gray-500 dark:text-gray-400">No mentors found matching your criteria.</p>
+			{#if loading}
+				<div class="flex items-center justify-center py-20">
+					<div class="h-8 w-8 animate-spin rounded-full border-4 border-rose-500 border-t-transparent"></div>
 				</div>
+			{:else}
+				<!-- Recommended Mentors Section -->
+				{#if recommendedMentors.length > 0 && showRecommended}
+					<section class="mb-8">
+						<div class="mb-4 flex items-center justify-between">
+							<h2 class="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+								<Sparkles class="h-5 w-5 text-rose-500" />
+								Recommended for You
+							</h2>
+							<button
+								onclick={() => (showRecommended = false)}
+								class="text-sm text-gray-500 hover:text-gray-700"
+							>
+								Hide
+							</button>
+						</div>
+						<div class="grid gap-4 md:grid-cols-2">
+							{#each recommendedMentors as match (match.mentorId)}
+								<Card class="border-2 border-rose-100 p-4 dark:border-rose-900/30">
+									<div class="mb-2 flex items-center gap-2">
+										<span class="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+											{Math.round(match.score)}% Match
+										</span>
+									</div>
+									<div class="flex gap-3">
+										<Avatar src={match.profile.user.avatarUrl ?? undefined} alt={match.profile.user.name || 'Mentor'} size="lg" />
+										<div class="flex-1">
+											<h3 class="font-semibold text-gray-900 dark:text-white">{match.profile.user.name || 'Mentor'}</h3>
+											<p class="text-sm text-gray-500">{match.profile.user.location || 'Remote'}</p>
+											{#if match.matchedSkills.length > 0}
+												<div class="mt-1 flex flex-wrap gap-1">
+													{#each match.matchedSkills.slice(0, 3) as skill}
+														<span class="text-xs text-rose-500">#{skill}</span>
+													{/each}
+												</div>
+											{/if}
+										</div>
+										<Button size="sm" onclick={() => handleConnect(match.mentorId)}>
+											Connect
+										</Button>
+									</div>
+								</Card>
+							{/each}
+						</div>
+					</section>
+				{/if}
+
+				<!-- All Mentors -->
+				<h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">All Mentors</h2>
+				<div class="space-y-4">
+					{#each filteredMentors as mentor (mentor.id)}
+						<div class="flex gap-4">
+							<!-- Connect Button on Left -->
+							<div class="hidden lg:flex lg:flex-col lg:justify-center">
+								<Button size="sm" onclick={() => handleConnect(mentor.id)}>{$t.mentors.connect}</Button>
+							</div>
+
+							<Card class="flex-1 p-4">
+								<!-- Status Indicator & Comment Icon -->
+								<div class="mb-3 flex items-start justify-between">
+									<div class="flex items-center gap-2">
+										{#if mentor.availability === 'available'}
+											<span
+												class="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+											>
+												<span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+												Available
+											</span>
+										{:else}
+											<span
+												class="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+											>
+												<span class="h-2 w-2 rounded-full bg-red-500"></span>
+												Unavailable
+											</span>
+										{/if}
+									</div>
+									<button class="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+										<MessageCircle class="h-5 w-5 text-gray-400" />
+									</button>
+								</div>
+
+								<div class="flex gap-4">
+									<!-- Avatar with status dot -->
+									<div class="relative">
+										<Avatar src={mentor.user?.avatarUrl} alt={mentor.user?.name || 'Mentor'} size="xl" />
+										<span
+											class="absolute right-0 bottom-0 h-4 w-4 rounded-full border-2 border-white {mentor.availability ===
+											'available'
+												? 'bg-emerald-500'
+												: 'bg-red-500'} dark:border-gray-900"
+										></span>
+									</div>
+
+									<div class="flex-1">
+										<!-- Name & Bio -->
+										<h3 class="font-semibold text-gray-900 dark:text-white">{mentor.user?.name || 'Unknown'}</h3>
+										<p class="text-sm text-gray-500 dark:text-gray-400">{mentor.bio || mentor.user?.bio}</p>
+
+										<!-- Skills -->
+										{#if mentor.skills && mentor.skills.length > 0}
+											<div class="mt-2 flex flex-wrap gap-1.5">
+												{#each mentor.skills as skill}
+													<Badge variant="secondary">{skill}</Badge>
+												{/each}
+											</div>
+										{/if}
+
+										<!-- Stats: Mentees, Experience, Years -->
+										<div
+											class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400"
+										>
+											<span class="flex items-center gap-1">
+												<Users class="h-4 w-4" />
+												{mentor.currentMenteesCount} mentees
+											</span>
+											{#if mentor.yearsExperience}
+												<span class="flex items-center gap-1">
+													<Briefcase class="h-4 w-4" />
+													{mentor.yearsExperience} years exp
+												</span>
+											{/if}
+											<span class="flex items-center gap-1">
+												<Calendar class="h-4 w-4" />
+												{mentor.yearsExperience || 1}+ years
+											</span>
+											<span class="flex items-center gap-1">
+												<MapPin class="h-4 w-4" />
+												{mentor.user?.location || 'Remote'}
+											</span>
+										</div>
+									</div>
+								</div>
+
+								<!-- Mobile Connect Button -->
+								<div class="mt-4 lg:hidden">
+									<Button class="w-full" onclick={() => handleConnect(mentor.id)}>{$t.mentors.connect}</Button>
+								</div>
+							</Card>
+						</div>
+					{/each}
+				</div>
+
+				{#if filteredMentors.length === 0}
+					<div class="py-12 text-center">
+						<p class="text-gray-500 dark:text-gray-400">No mentors found matching your criteria.</p>
+					</div>
+				{/if}
 			{/if}
 		</div>
 	</main>

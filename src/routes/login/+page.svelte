@@ -4,16 +4,26 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import { t } from '$lib/i18n';
+	import { authStore } from '$lib/stores/auth';
 
 	let email = $state('');
 	let password = $state('');
 	let loading = $state(false);
+	let error = $state('');
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		loading = true;
-		await new Promise((r) => setTimeout(r, 1000));
-		goto('/dashboard');
+		error = '';
+
+		const result = await authStore.login(email, password);
+		
+		if (result.success) {
+			goto('/dashboard');
+		} else {
+			error = result.error || 'Login failed';
+		}
+		loading = false;
 	}
 </script>
 
@@ -43,6 +53,12 @@
 		<!-- Form Card -->
 		<div class="card p-6">
 			<form onsubmit={handleSubmit} class="space-y-4">
+				{#if error}
+					<div class="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+						{error}
+					</div>
+				{/if}
+				
 				<Input
 					type="email"
 					label={$t.auth.email}

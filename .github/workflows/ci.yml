@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd server && bun install
+
+      - name: Lint
+        run: cd server && bun run lint
+
+      - name: TypeScript Check
+        run: cd server && bunx tsc --noEmit
+
+      - name: Run tests
+        run: cd server && bun test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd server && bun install
+
+      - name: Generate Prisma Client
+        run: cd server && bunx prisma generate
+
+      - name: Build
+        run: cd server && bun run build

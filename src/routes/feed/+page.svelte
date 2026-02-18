@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import VideoThumbnail from '$lib/components/video-thumbnail.svelte';
 	import VideoModal from '$lib/components/video-modal.svelte';
@@ -16,10 +17,12 @@
 		MessageCircle,
 		TrendingUp
 	} from 'lucide-svelte';
-	import { mockVideos } from '$lib/data/mock';
-	import type { Video } from '$lib/data/mock';
 	import { t } from '$lib/i18n';
+	import { videosApi } from '$lib/api';
+	import type { Video } from '$lib/api/types';
 
+	let videos = $state<Video[]>([]);
+	let loading = $state(true);
 	let viewMode = $state<'grid' | 'vertical'>('vertical');
 	let searchQuery = $state('');
 	let selectedCategory = $state('all');
@@ -46,19 +49,29 @@
 		$t.hashtags.empowermentTag
 	]);
 
+	onMount(async () => {
+		try {
+			const response = await videosApi.getAll({ limit: 50 });
+			videos = response.data;
+		} catch (error) {
+			console.error('Failed to load videos:', error);
+		} finally {
+			loading = false;
+		}
+	});
+
 	const filteredVideos = $derived(
-		mockVideos
-			.map((video, index) => ({ ...video, isTrending: index < 3 }))
+		videos
 			.filter((video) => {
 				const matchesSearch =
 					video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					video.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+					(video.tags && video.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())));
 				const matchesCategory = selectedCategory === 'all' || video.category === selectedCategory;
 				const matchesHashtag =
 					!selectedHashtag ||
-					video.tags.some((tag) =>
+					(video.tags && video.tags.some((tag) =>
 						tag.toLowerCase().includes(selectedHashtag.toLowerCase().replace('#', ''))
-					);
+					));
 				return matchesSearch && matchesCategory && matchesHashtag;
 			})
 	);
@@ -71,6 +84,17 @@
 		if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
 		if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
 		return num.toString();
+	}
+
+	async function handleLike(video: Video) {
+		try {
+			await videosApi.like(video.id);
+			videos = videos.map(v => 
+				v.id === video.id ? { ...v, likesCount: v.likesCount + 1 } : v
+			);
+		} catch (error) {
+			console.error('Failed to like video:', error);
+		}
 	}
 </script>
 
@@ -178,7 +202,11 @@
 			</div>
 
 			<!-- Video Grid -->
-			{#if viewMode === 'grid'}
+			{#if loading}
+				<div class="flex items-center justify-center py-20">
+					<div class="h-8 w-8 animate-spin rounded-full border-4 border-rose-500 border-t-transparent"></div>
+				</div>
+			{:else if viewMode === 'grid'}
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
 					{#each filteredVideos as video (video.id)}
 						<VideoThumbnail {video} onclick={() => (selectedVideo = video)} />
@@ -193,18 +221,20 @@
 							<div class="relative aspect-video overflow-hidden rounded-xl bg-gray-900">
 								<video
 									src={video.videoUrl}
-									poster={video.thumbnail}
+									poster={video.thumbnailUrl || video.videoUrl}
 									class="h-full w-full object-cover"
 									controls
 								></video>
 
 								<!-- Top Tags -->
 								<div class="absolute top-3 right-3 left-3 flex items-start justify-between">
-									<span
-										class="rounded-lg bg-black/60 px-3 py-1 text-xs font-medium text-white capitalize"
-									>
-										{video.category}
-									</span>
+									{#if video.category}
+										<span
+											class="rounded-lg bg-black/60 px-3 py-1 text-xs font-medium text-white capitalize"
+										>
+											{video.category}
+										</span>
+									{/if}
 									{#if video.isTrending}
 										<span
 											class="flex items-center gap-1 rounded-lg bg-rose-500 px-3 py-1 text-xs font-medium text-white"
@@ -224,22 +254,26 @@
 
 							<!-- User Info & Description -->
 							<div class="flex gap-3">
-								<Avatar src={video.author.avatar} alt={video.author.name} size="lg" />
+								<Avatar src={video.author?.avatarUrl} alt={video.author?.name || 'User'} size="lg" />
 								<div class="flex-1">
 									<h3 class="line-clamp-2 font-semibold text-gray-900 dark:text-white">
 										{video.title}
 									</h3>
-									<p class="mt-1 text-sm text-gray-500">{video.author.name}</p>
-									<p class="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
-										{video.description}
-									</p>
+									<p class="mt-1 text-sm text-gray-500">{video.author?.name || 'Unknown'}</p>
+									{#if video.description}
+										<p class="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
+											{video.description}
+										</p>
+									{/if}
 
 									<!-- Tags -->
-									<div class="mt-2 flex flex-wrap gap-2">
-										{#each video.tags as tag}
-											<span class="text-sm text-rose-500">#{tag}</span>
-										{/each}
-									</div>
+									{#if video.tags && video.tags.length > 0}
+										<div class="mt-2 flex flex-wrap gap-2">
+											{#each video.tags as tag}
+												<span class="text-sm text-rose-500">#{tag}</span>
+											{/each}
+										</div>
+									{/if}
 								</div>
 							</div>
 
@@ -249,21 +283,22 @@
 							>
 								<button
 									class="flex items-center gap-2 text-gray-600 transition-colors hover:text-rose-500 dark:text-gray-400"
+									onclick={() => handleLike(video)}
 								>
 									<Heart class="h-5 w-5" />
-									<span class="text-sm font-medium">{formatNumber(video.likes)}</span>
+									<span class="text-sm font-medium">{formatNumber(video.likesCount)}</span>
 								</button>
 								<button
 									class="flex items-center gap-2 text-gray-600 transition-colors hover:text-rose-500 dark:text-gray-400"
 								>
 									<MessageCircle class="h-5 w-5" />
-									<span class="text-sm font-medium">{formatNumber(video.comments)}</span>
+									<span class="text-sm font-medium">{formatNumber(video.commentsCount)}</span>
 								</button>
 								<button
 									class="flex items-center gap-2 text-gray-600 transition-colors hover:text-rose-500 dark:text-gray-400"
 								>
 									<Share2 class="h-5 w-5" />
-									<span class="text-sm font-medium">{formatNumber(video.shares)}</span>
+									<span class="text-sm font-medium">{formatNumber(video.sharesCount)}</span>
 								</button>
 							</div>
 						</Card>
@@ -271,7 +306,7 @@
 				</div>
 			{/if}
 
-			{#if filteredVideos.length === 0}
+			{#if !loading && filteredVideos.length === 0}
 				<div class="py-12 text-center">
 					<p class="text-gray-500 dark:text-gray-400">{$t.feed.noVideosFound}</p>
 				</div>
@@ -279,5 +314,7 @@
 		</div>
 	</main>
 
-	<VideoModal video={selectedVideo} open={!!selectedVideo} onClose={() => (selectedVideo = null)} />
+	{#if selectedVideo}
+		<VideoModal video={selectedVideo} open={!!selectedVideo} onClose={() => (selectedVideo = null)} />
+	{/if}
 </div>

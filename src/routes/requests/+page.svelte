@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Button from '$lib/components/ui/button.svelte';
@@ -16,22 +17,36 @@
 		MessageCircle,
 		Share2
 	} from 'lucide-svelte';
-	import { mockFundingRequests } from '$lib/data/mock';
 	import { t } from '$lib/i18n';
+	import { requestsApi } from '$lib/api';
+	import type { FundingRequest } from '$lib/api/types';
 
+	let requests = $state<FundingRequest[]>([]);
+	let loading = $state(true);
 	let searchQuery = $state('');
 	let selectedCategory = $state('all');
 
 	const categories = ['all', 'education', 'business', 'healthcare', 'technology', 'arts'];
 
-	const stats = {
-		activeRequests: mockFundingRequests.length,
-		raisedThisMonth: mockFundingRequests.reduce((sum, r) => sum + r.currentAmount, 0),
+	onMount(async () => {
+		try {
+			const response = await requestsApi.getAll({ status: 'active' });
+			requests = response.requests;
+		} catch (error) {
+			console.error('Failed to load requests:', error);
+		} finally {
+			loading = false;
+		}
+	});
+
+	const stats = $derived({
+		activeRequests: requests.length,
+		raisedThisMonth: requests.reduce((sum, r) => sum + r.currentAmount, 0),
 		successRate: 78
-	};
+	});
 
 	const filteredRequests = $derived(
-		mockFundingRequests.filter((request) => {
+		requests.filter((request) => {
 			const matchesSearch =
 				request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				request.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -137,82 +152,90 @@
 			</div>
 
 			<!-- Requests Grid -->
-			<div class="grid gap-6 md:grid-cols-2">
-				{#each filteredRequests as request (request.id)}
-					<Card class="overflow-hidden">
-						{#if request.imageUrl}
-							<img src={request.imageUrl} alt={request.title} class="h-48 w-full object-cover" />
-						{:else}
-							<div class="h-48 w-full bg-gradient-to-br from-rose-200 to-orange-200"></div>
-						{/if}
+			{#if loading}
+				<div class="flex items-center justify-center py-20">
+					<div class="h-8 w-8 animate-spin rounded-full border-4 border-rose-500 border-t-transparent"></div>
+				</div>
+			{:else}
+				<div class="grid gap-6 md:grid-cols-2">
+					{#each filteredRequests as request (request.id)}
+						<Card class="overflow-hidden">
+							{#if request.coverImageUrl}
+								<img src={request.coverImageUrl} alt={request.title} class="h-48 w-full object-cover" />
+							{:else}
+								<div class="h-48 w-full bg-gradient-to-br from-rose-200 to-orange-200"></div>
+							{/if}
 
-						<div class="p-5">
-							<div class="mb-3 flex items-start gap-3">
-								<Avatar src={request.author.avatar} alt={request.author.name} size="sm" />
-								<div class="flex-1">
-									<p class="font-medium text-gray-900 dark:text-white">{request.author.name}</p>
-									<p class="text-xs text-gray-500">
-										{new Date(request.createdAt).toLocaleDateString()}
-									</p>
+							<div class="p-5">
+								<div class="mb-3 flex items-start gap-3">
+									<Avatar src={request.author?.avatarUrl} alt={request.author?.name || 'Author'} size="sm" />
+									<div class="flex-1">
+										<p class="font-medium text-gray-900 dark:text-white">{request.author?.name || 'Unknown'}</p>
+										<p class="text-xs text-gray-500">
+											{new Date(request.createdAt).toLocaleDateString()}
+										</p>
+									</div>
+									{#if request.category}
+										<Badge>{request.category}</Badge>
+									{/if}
 								</div>
-								<Badge>{request.category}</Badge>
-							</div>
 
-							<h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-								{request.title}
-							</h3>
-							<p class="mb-4 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
-								{request.description}
-							</p>
+								<h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+									{request.title}
+								</h3>
+								<p class="mb-4 line-clamp-2 text-sm text-gray-600 dark:text-gray-400">
+									{request.description}
+								</p>
 
-							<!-- Progress -->
-							<div class="mb-2">
-								<Progress value={request.currentAmount} max={request.goalAmount} />
-							</div>
-							<div class="mb-4 flex items-center justify-between text-sm">
-								<span class="font-semibold text-rose-500">
-									${request.currentAmount.toLocaleString()}
-									<span class="font-normal text-gray-500 dark:text-gray-400">{$t.requests.raised}</span>
-								</span>
-								<span class="text-gray-500 dark:text-gray-400">
-									${request.goalAmount.toLocaleString()} {$t.requests.goal}
-								</span>
-							</div>
+								<!-- Progress -->
+								<div class="mb-2">
+									<Progress value={request.currentAmount} max={request.goalAmount} />
+								</div>
+								<div class="mb-4 flex items-center justify-between text-sm">
+									<span class="font-semibold text-rose-500">
+										${request.currentAmount.toLocaleString()}
+										<span class="font-normal text-gray-500 dark:text-gray-400">{$t.requests.raised}</span>
+									</span>
+									<span class="text-gray-500 dark:text-gray-400">
+										${request.goalAmount.toLocaleString()} {$t.requests.goal}
+									</span>
+								</div>
 
-							<div class="mb-4 flex items-center justify-between text-sm">
-								<span class="flex items-center gap-1">
-									<Users class="h-4 w-4" />
-									{request.supporters} {$t.requests.supportersCount}
-								</span>
-								<span class="flex items-center gap-1">
-									{calculateProgress(request.currentAmount, request.goalAmount)}% funded
-								</span>
-							</div>
+								<div class="mb-4 flex items-center justify-between text-sm">
+									<span class="flex items-center gap-1">
+										<Users class="h-4 w-4" />
+										{request.supportersCount} {$t.requests.supportersCount}
+									</span>
+									<span class="flex items-center gap-1">
+										{calculateProgress(request.currentAmount, request.goalAmount)}% {$t.requests.funded}
+									</span>
+								</div>
 
-							<!-- Social Icons -->
-							<div class="mb-4 flex items-center gap-6 text-gray-500 dark:text-gray-400">
-								<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
-									<Heart class="h-4 w-4" />
-									<span class="text-sm">{Math.floor(Math.random() * 500) + 50}</span>
-								</button>
-								<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
-									<MessageCircle class="h-4 w-4" />
-									<span class="text-sm">{Math.floor(Math.random() * 100) + 10}</span>
-								</button>
-								<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
-									<Share2 class="h-4 w-4" />
-									<span class="text-sm">{Math.floor(Math.random() * 50) + 5}</span>
-								</button>
-							</div>
+								<!-- Social Icons -->
+								<div class="mb-4 flex items-center gap-6 text-gray-500 dark:text-gray-400">
+									<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
+										<Heart class="h-4 w-4" />
+										<span class="text-sm">{Math.floor(Math.random() * 500) + 50}</span>
+									</button>
+									<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
+										<MessageCircle class="h-4 w-4" />
+										<span class="text-sm">{Math.floor(Math.random() * 100) + 10}</span>
+									</button>
+									<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
+										<Share2 class="h-4 w-4" />
+										<span class="text-sm">{Math.floor(Math.random() * 50) + 5}</span>
+									</button>
+								</div>
 
-							<Button class="w-full">
-								<Heart class="mr-2 h-4 w-4" />
-								{$t.requests.donate}
-							</Button>
-						</div>
-					</Card>
-				{/each}
-			</div>
+								<Button class="w-full">
+									<Heart class="mr-2 h-4 w-4" />
+									{$t.requests.donate}
+								</Button>
+							</div>
+						</Card>
+					{/each}
+				</div>
+			{/if}
 
 			{#if filteredRequests.length === 0}
 				<div class="py-12 text-center">
