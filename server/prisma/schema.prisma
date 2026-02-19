@@ -1,0 +1,430 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String           @id @default(uuid())
+  email            String           @unique
+  passwordHash     String           @map("password_hash")
+  name             String
+  avatarUrl        String?          @map("avatar_url")
+  role             String           @default("woman")
+  bio              String?
+  location         String?
+  isPublic         Boolean          @default(true) @map("is_public")
+  emailVerified    Boolean          @default(false) @map("email_verified")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  skills           UserSkill[]
+  interests        UserInterest[]
+  videos           Video[]
+  videoLikes       VideoLike[]
+  videoComments    VideoComment[]
+  fundingRequests  FundingRequest[]
+  fundingDonations FundingDonation[]
+  successStories   SuccessStory[]
+  successStoryCelebrations SuccessStoryCelebration[]
+  mentorProfile    MentorProfile?
+  mentorConnectionsAsMentee MentorConnection[] @relation("MenteeConnections")
+  notifications    Notification[]
+  settings         UserSettings?
+  followedBy       UserFollow[]    @relation("Follower")
+  following        UserFollow[]    @relation("Following")
+  conversationParticipations ConversationParticipant[]
+  sentMessages     Message[]        @relation("SentMessages")
+  goals            Goal[]
+  hostedEvents     Event[]          @relation("EventHost")
+  eventAttendances EventAttendee[]
+
+  @@map("users")
+}
+
+model UserSkill {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  skill     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skill])
+  @@map("user_skills")
+}
+
+model UserInterest {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  interest  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, interest])
+  @@map("user_interests")
+}
+
+model Video {
+  id            String         @id @default(uuid())
+  title         String
+  description   String?
+  thumbnailUrl  String?        @map("thumbnail_url")
+  videoUrl      String         @map("video_url")
+  videoDuration Int?           @map("video_duration")
+  category      String?
+  authorId      String         @map("author_id")
+  viewsCount    Int            @default(0) @map("views_count")
+  likesCount    Int            @default(0) @map("likes_count")
+  commentsCount Int            @default(0) @map("comments_count")
+  sharesCount   Int            @default(0) @map("shares_count")
+  isTrending    Boolean        @default(false) @map("is_trending")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  tags          VideoTag[]
+  likes         VideoLike[]
+  comments      VideoComment[]
+
+  @@index([authorId])
+  @@index([category])
+  @@index([isTrending, createdAt])
+  @@map("videos")
+}
+
+model VideoTag {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  tag       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, tag])
+  @@map("video_tags")
+}
+
+model VideoLike {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, userId])
+  @@map("video_likes")
+}
+
+model VideoComment {
+  id        String          @id @default(uuid())
+  videoId   String          @map("video_id")
+  userId    String          @map("user_id")
+  content   String
+  parentId  String?         @map("parent_id")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  video     Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    VideoComment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   VideoComment[]  @relation("CommentReplies")
+
+  @@map("video_comments")
+}
+
+model FundingRequest {
+  id               String            @id @default(uuid())
+  title            String
+  description      String
+  coverImageUrl    String?           @map("cover_image_url")
+  category         String?
+  goalAmount       Float           @map("goal_amount")
+  currentAmount    Float           @default(0) @map("current_amount")
+  supportersCount  Int               @default(0) @map("supporters_count")
+  authorId         String            @map("author_id")
+  status           String            @default("active")
+  deadline         DateTime
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  author           User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  donations        FundingDonation[]
+
+  @@index([authorId])
+  @@index([status])
+  @@map("funding_requests")
+}
+
+model FundingDonation {
+  id                  String          @id @default(uuid())
+  fundingRequestId    String          @map("funding_request_id")
+  donorId             String          @map("donor_id")
+  amount              Float
+  message             String?
+  isAnonymous         Boolean         @default(false) @map("is_anonymous")
+  createdAt           DateTime        @default(now()) @map("created_at")
+
+  fundingRequest      FundingRequest  @relation(fields: [fundingRequestId], references: [id], onDelete: Cascade)
+  donor               User            @relation(fields: [donorId], references: [id], onDelete: Cascade)
+
+  @@map("funding_donations")
+}
+
+model SuccessStory {
+  id                String                     @id @default(uuid())
+  title             String
+  description       String
+  beforeImageUrl    String?                    @map("before_image_url")
+  afterImageUrl     String?                    @map("after_image_url")
+  impactDescription String?                   @map("impact_description")
+  authorId          String                     @map("author_id")
+  celebrationsCount Int                       @default(0) @map("celebrations_count")
+  isFeatured        Boolean                    @default(false) @map("is_featured")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+
+  author             User                       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  celebrations       SuccessStoryCelebration[]
+
+  @@map("success_stories")
+}
+
+model SuccessStoryCelebration {
+  id              String       @id @default(uuid())
+  successStoryId  String       @map("success_story_id")
+  userId          String       @map("user_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  successStory    SuccessStory @relation(fields: [successStoryId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([successStoryId, userId])
+  @@map("success_story_celebrations")
+}
+
+model MentorProfile {
+  id                  String   @id @default(uuid())
+  userId             String   @unique @map("user_id")
+  bio                String?
+  availability       String   @default("available")
+  yearsExperience    Int?     @map("years_experience")
+  maxMentees         Int      @default(5) @map("max_mentees")
+  currentMenteesCount Int     @default(0) @map("current_mentees_count")
+  acceptsRemote      Boolean  @default(true) @map("accepts_remote")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills             MentorSkill[]
+  connectionsAsMentor MentorConnection[] @relation("MentorProfileConnections")
+}
+
+model MentorSkill {
+  id        String        @id @default(uuid())
+  mentorId  String        @map("mentor_id")
+  skill     String
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  mentor    MentorProfile @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@unique([mentorId, skill])
+  @@map("mentor_skills")
+}
+
+model MentorConnection {
+  id        String   @id @default(uuid())
+  mentorId  String   @map("mentor_id")
+  menteeId  String   @map("mentee_id")
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  mentor    MentorProfile @relation("MentorProfileConnections", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee    User          @relation("MenteeConnections", fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@unique([mentorId, menteeId])
+  @@map("mentor_connections")
+}
+
+model Conversation {
+  id        String                   @id @default(uuid())
+  createdAt DateTime                 @default(now()) @map("created_at")
+
+  participants ConversationParticipant[]
+  messages      Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  userId         String      @map("user_id")
+  lastMessageAt  DateTime    @default(now()) @map("last_message_at")
+  unreadCount    Int         @default(0) @map("unread_count")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  senderId       String       @map("sender_id")
+  content        String
+  isRead         Boolean      @default(false) @map("is_read")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model UserSettings {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  emailNotifications Boolean @default(true) @map("email_notifications")
+  pushNotifications  Boolean @default(true) @map("push_notifications")
+  mentorMessagesNotifications Boolean @default(true) @map("mentor_messages_notifications")
+  supporterUpdatesNotifications Boolean @default(true) @map("supporter_updates_notifications")
+  weeklyDigest   Boolean @default(false) @map("weekly_digest")
+  language       String   @default("en")
+  theme          String   @default("system")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model UserFollow {
+  id          String   @id @default(uuid())
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("user_follows")
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  title       String
+  description String?
+  category    String
+  targetDate  DateTime @map("target_date")
+  status      String   @default("in_progress")
+  progress    Int      @default(0)
+  priority    String   @default("medium")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones  GoalMilestone[]
+
+  @@index([userId, status])
+  @@map("goals")
+}
+
+model GoalMilestone {
+  id          String   @id @default(uuid())
+  goalId      String   @map("goal_id")
+  title       String
+  description String?
+  dueDate     DateTime? @map("due_date")
+  completed   Boolean  @default(false)
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@map("goal_milestones")
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  coverImage  String?  @map("cover_image")
+  eventDate   DateTime @map("event_date")
+  endDate     DateTime? @map("end_date")
+  location    String?
+  isVirtual   Boolean  @default(false) @map("is_virtual")
+  meetingUrl  String?  @map("meeting_url")
+  category    String
+  maxAttendees Int?
+  attendeeCount Int    @default(0) @map("attendee_count")
+  hostId      String   @map("host_id")
+  status      String   @default("upcoming")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  host        User     @relation("EventHost", fields: [hostId], references: [id], onDelete: Cascade)
+  attendees   EventAttendee[]
+
+  @@index([eventDate, status])
+  @@map("events")
+}
+
+model EventAttendee {
+  id        String   @id @default(uuid())
+  eventId   String   @map("event_id")
+  userId    String   @map("user_id")
+  status    String   @default("registered")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_attendees")
+}
+
+model ModerationReport {
+  id          String   @id @default(uuid())
+  reporterId  String   @map("reporter_id")
+  contentType String   @map("content_type")
+  contentId   String   @map("content_id")
+  reason      String
+  description String?
+  status      String   @default("pending")
+  reviewedBy  String?  @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+  action      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([contentType, contentId])
+  @@index([status])
+  @@map("moderation_reports")
+}
