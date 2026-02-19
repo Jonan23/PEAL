@@ -15,7 +15,8 @@
 		Share2,
 		SlidersHorizontal,
 		MessageCircle,
-		TrendingUp
+		TrendingUp,
+		Check
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { videosApi } from '$lib/api';
@@ -28,6 +29,7 @@
 	let selectedCategory = $state('all');
 	let selectedVideo = $state<Video | null>(null);
 	let selectedHashtag = $state('');
+	let copiedVideoId = $state<string | null>(null);
 
 	const categories = [
 		'all',
@@ -96,6 +98,34 @@
 			console.error('Failed to like video:', error);
 		}
 	}
+
+	async function handleShare(video: Video) {
+		const shareUrl = `${window.location.origin}/feed?v=${video.id}`;
+		const shareData = {
+			title: video.title,
+			text: video.description || `Check out this video: ${video.title}`,
+			url: shareUrl
+		};
+
+		try {
+			if (navigator.share) {
+				await navigator.share(shareData);
+			} else {
+				await navigator.clipboard.writeText(shareUrl);
+				copiedVideoId = video.id;
+				setTimeout(() => {
+					copiedVideoId = null;
+				}, 2000);
+			}
+			videos = videos.map(v =>
+				v.id === video.id ? { ...v, sharesCount: v.sharesCount + 1 } : v
+			);
+		} catch (error) {
+			if ((error as Error).name !== 'AbortError') {
+				console.error('Failed to share:', error);
+			}
+		}
+	}
 </script>
 
 <svelte:head>
@@ -121,10 +151,12 @@
 							<Heart class="mr-1 h-4 w-4" />
 							{$t.common.like}
 						</Button>
-						<Button variant="secondary" size="sm">
-							<Share2 class="mr-1 h-4 w-4" />
-							{$t.common.share}
-						</Button>
+						<a href="/feed/upload">
+							<Button variant="primary" size="sm">
+								<Share2 class="mr-1 h-4 w-4" />
+								{$t.nav.shareVideo}
+							</Button>
+						</a>
 						<Button variant="secondary" size="sm">
 							<SlidersHorizontal class="mr-1 h-4 w-4" />
 							{$t.common.filter}
@@ -296,9 +328,15 @@
 								</button>
 								<button
 									class="flex items-center gap-2 text-gray-600 transition-colors hover:text-rose-500 dark:text-gray-400"
+									onclick={() => handleShare(video)}
 								>
-									<Share2 class="h-5 w-5" />
-									<span class="text-sm font-medium">{formatNumber(video.sharesCount)}</span>
+									{#if copiedVideoId === video.id}
+										<Check class="h-5 w-5 text-green-500" />
+										<span class="text-sm font-medium text-green-500">Copied!</span>
+									{:else}
+										<Share2 class="h-5 w-5" />
+										<span class="text-sm font-medium">{formatNumber(video.sharesCount)}</span>
+									{/if}
 								</button>
 							</div>
 						</Card>
