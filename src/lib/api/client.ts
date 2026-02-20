@@ -2,7 +2,7 @@ import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { authStore } from "$lib/stores/auth";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://peal-server.onrender.com";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
