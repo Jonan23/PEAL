@@ -1,9 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	onMount(() => {
-		goto('/dashboard');
+		if (!browser) return;
+
+		const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding') === 'true';
+		const accessToken = localStorage.getItem('accessToken');
+
+		if (accessToken) {
+			goto('/dashboard');
+		} else if (!hasSeenOnboarding) {
+			goto('/onboarding');
+		} else {
+			goto('/login');
+		}
 	});
 </script>
 

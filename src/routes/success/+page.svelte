@@ -5,20 +5,52 @@
 	import Button from '$lib/components/ui/button.svelte';
 	import Avatar from '$lib/components/ui/avatar.svelte';
 	import Badge from '$lib/components/ui/badge.svelte';
-	import { Share2, Heart, MessageCircle, TrendingUp, Users, Globe, Sparkles } from 'lucide-svelte';
+	import {
+		Share2,
+		Heart,
+		TrendingUp,
+		Users,
+		Globe,
+		Sparkles,
+		X,
+		Trash2,
+		Image as ImageIcon
+	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { storiesApi } from '$lib/api';
+	import { uploadFile } from '$lib/api/upload';
+	import { authStore } from '$lib/stores/auth';
 	import type { SuccessStory } from '$lib/api/types';
 
 	let stories = $state<SuccessStory[]>([]);
 	let loading = $state(true);
+	let currentUserId = $state<string | null>(null);
+	let showShareForm = $state(false);
+	let creating = $state(false);
+	let deletingId = $state<string | null>(null);
+	let formError = $state('');
+	let formSuccess = $state('');
+	let beforeImageFile = $state<File | null>(null);
+	let afterImageFile = $state<File | null>(null);
+	let beforePreview = $state('');
+	let afterPreview = $state('');
+
+	let storyForm = $state({
+		title: '',
+		description: '',
+		impactDescription: ''
+	});
 
 	onMount(async () => {
+		await authStore.initialize();
+		currentUserId = $authStore.user?.id || null;
+
 		try {
 			const response = await storiesApi.getAll();
-			stories = response.stories;
+			stories = response.stories || [];
 		} catch (error) {
 			console.error('Failed to load stories:', error);
+			stories = [];
 		} finally {
 			loading = false;
 		}
@@ -38,6 +70,100 @@
 			);
 		} catch (error) {
 			console.error('Failed to celebrate:', error);
+		}
+	}
+
+	function handleImageChange(event: globalThis.Event, target: 'before' | 'after') {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		const preview = URL.createObjectURL(file);
+		if (target === 'before') {
+			if (beforePreview) URL.revokeObjectURL(beforePreview);
+			beforeImageFile = file;
+			beforePreview = preview;
+		} else {
+			if (afterPreview) URL.revokeObjectURL(afterPreview);
+			afterImageFile = file;
+			afterPreview = preview;
+		}
+	}
+
+	function resetShareForm() {
+		storyForm = {
+			title: '',
+			description: '',
+			impactDescription: ''
+		};
+		formError = '';
+		beforeImageFile = null;
+		afterImageFile = null;
+		if (beforePreview) URL.revokeObjectURL(beforePreview);
+		if (afterPreview) URL.revokeObjectURL(afterPreview);
+		beforePreview = '';
+		afterPreview = '';
+	}
+
+	async function handleShareStory() {
+		formError = '';
+		formSuccess = '';
+
+		if (!storyForm.title.trim() || !storyForm.description.trim()) {
+			formError = 'Title and description are required.';
+			return;
+		}
+
+		creating = true;
+		try {
+			let beforeImageUrl: string | undefined;
+			let afterImageUrl: string | undefined;
+
+			if (beforeImageFile) {
+				const upload = await uploadFile(beforeImageFile, 'image');
+				beforeImageUrl = upload.url;
+			}
+
+			if (afterImageFile) {
+				const upload = await uploadFile(afterImageFile, 'image');
+				afterImageUrl = upload.url;
+			}
+
+			const response = await storiesApi.create({
+				title: storyForm.title.trim(),
+				description: storyForm.description.trim(),
+				impactDescription: storyForm.impactDescription.trim() || undefined,
+				beforeImageUrl,
+				afterImageUrl
+			});
+
+			stories = [response.story, ...stories];
+			showShareForm = false;
+			formSuccess = 'Story shared successfully.';
+			resetShareForm();
+		} catch (error) {
+			formError = error instanceof Error ? error.message : 'Failed to share story';
+		} finally {
+			creating = false;
+		}
+	}
+
+	async function handleDeleteStory(storyId: string) {
+		const confirmed = confirm('Delete this success story permanently?');
+		if (!confirmed) return;
+
+		deletingId = storyId;
+		formError = '';
+		formSuccess = '';
+
+		try {
+			await storiesApi.delete(storyId);
+			stories = stories.filter((story) => story.id !== storyId);
+			formSuccess = 'Story deleted successfully.';
+		} catch (error) {
+			formError = error instanceof Error ? error.message : 'Failed to delete story';
+		} finally {
+			deletingId = null;
 		}
 	}
 
@@ -69,11 +195,85 @@
 						</p>
 					</div>
 
-					<Button>
+					<Button onclick={() => (showShareForm = true)}>
 						<Share2 class="mr-2 h-4 w-4" />
 						{$t.success.shareStory}
 					</Button>
 				</div>
+
+				{#if formSuccess}
+					<p class="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{formSuccess}</p>
+				{/if}
+				{#if formError}
+					<p class="mt-3 text-sm text-red-600 dark:text-red-400">{formError}</p>
+				{/if}
+
+				{#if showShareForm}
+					<Card class="mt-4 border-rose-200 p-5 dark:border-rose-900/40">
+						<div class="mb-4 flex items-center justify-between">
+							<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Share Success Story</h2>
+							<button
+								onclick={() => {
+									showShareForm = false;
+									resetShareForm();
+								}}
+								class="rounded-lg p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+							>
+								<X class="h-4 w-4" />
+							</button>
+						</div>
+
+						<div class="grid gap-4 md:grid-cols-2">
+							<div class="md:col-span-2">
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+								<input type="text" bind:value={storyForm.title} class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800" />
+							</div>
+
+							<div class="md:col-span-2">
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+								<textarea rows="3" bind:value={storyForm.description} class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"></textarea>
+							</div>
+
+							<div class="md:col-span-2">
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Impact Summary (Optional)</label>
+								<input type="text" bind:value={storyForm.impactDescription} class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800" />
+							</div>
+
+							<div>
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Before Image (Optional)</label>
+								<label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+									<ImageIcon class="h-4 w-4" />
+									Upload image
+									<input type="file" accept="image/*" class="hidden" onchange={(e) => handleImageChange(e, 'before')} />
+								</label>
+								{#if beforePreview}
+									<img src={beforePreview} alt="Before preview" class="mt-2 h-20 w-28 rounded-lg object-cover" />
+								{/if}
+							</div>
+
+							<div>
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">After Image (Optional)</label>
+								<label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+									<ImageIcon class="h-4 w-4" />
+									Upload image
+									<input type="file" accept="image/*" class="hidden" onchange={(e) => handleImageChange(e, 'after')} />
+								</label>
+								{#if afterPreview}
+									<img src={afterPreview} alt="After preview" class="mt-2 h-20 w-28 rounded-lg object-cover" />
+								{/if}
+							</div>
+						</div>
+
+						<div class="mt-4 flex items-center gap-3">
+							<Button onclick={handleShareStory} disabled={creating}>
+								{creating ? 'Sharing...' : 'Share Story'}
+							</Button>
+							<Button variant="secondary" onclick={() => { showShareForm = false; resetShareForm(); }}>
+								Cancel
+							</Button>
+						</div>
+					</Card>
+				{/if}
 			</div>
 
 			<!-- Stats -->
@@ -196,13 +396,23 @@
 									</div>
 								</div>
 
-								<div class="flex items-center gap-3">
-									<Button variant="secondary" onclick={() => handleCelebrate(stories[0].id)}>
-										<Sparkles class="mr-2 h-4 w-4" />
-										{$t.success.celebrate}
+							<div class="flex items-center gap-3">
+								<Button variant="secondary" onclick={() => handleCelebrate(stories[0].id)}>
+									<Sparkles class="mr-2 h-4 w-4" />
+									{$t.success.celebrate}
+								</Button>
+								{#if stories[0].authorId === currentUserId}
+									<Button
+										variant="destructive"
+										onclick={() => handleDeleteStory(stories[0].id)}
+										disabled={deletingId === stories[0].id}
+									>
+										<Trash2 class="mr-2 h-4 w-4" />
+										{deletingId === stories[0].id ? 'Deleting...' : 'Delete'}
 									</Button>
-								</div>
+								{/if}
 							</div>
+						</div>
 						</div>
 					</Card>
 				{/if}
@@ -264,12 +474,22 @@
 									</div>
 
 									<div class="mt-3 flex gap-2">
-										<Button variant="secondary" size="sm" class="flex-1" onclick={() => handleCelebrate(story.id)}>
-											<Sparkles class="mr-1 h-3 w-3" />
-											{$t.success.celebrate}
+									<Button variant="secondary" size="sm" class="flex-1" onclick={() => handleCelebrate(story.id)}>
+										<Sparkles class="mr-1 h-3 w-3" />
+										{$t.success.celebrate}
+									</Button>
+									{#if story.authorId === currentUserId}
+										<Button
+											variant="destructive"
+											size="sm"
+											onclick={() => handleDeleteStory(story.id)}
+											disabled={deletingId === story.id}
+										>
+											{deletingId === story.id ? 'Deleting...' : 'Delete'}
 										</Button>
-									</div>
+									{/if}
 								</div>
+							</div>
 							</Card>
 						{/each}
 					</div>

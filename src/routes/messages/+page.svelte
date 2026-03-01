@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Avatar from '$lib/components/ui/avatar.svelte';
@@ -7,20 +7,69 @@
 	import { Search, Send, MoreVertical, Phone, Video } from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { messagesApi } from '$lib/api';
+	import { websocket } from '$lib/api/websocket';
 	import { authStore } from '$lib/stores/auth';
-	import type { Conversation, Message, User } from '$lib/api/types';
+	import type { Conversation, Message } from '$lib/api/types';
 
 	let conversations = $state<Conversation[]>([]);
 	let selectedConversation = $state<Conversation | null>(null);
 	let messages = $state<Message[]>([]);
-	let currentUser = $state<User | null>(null);
+	let currentUser = $state<{ id: string; name: string } | null>(null);
 	let loading = $state(true);
 	let messageInput = $state('');
 	let searchQuery = $state('');
+	let typingUsers = $state<string[]>([]);
+	let typingTimeout: ReturnType<typeof setTimeout> | null = null;
+	let stopTypingListener: (() => void) | null = null;
+	let stopMessageListener: (() => void) | null = null;
+	let currentRoomId: string | null = null;
+	let pageError = $state('');
+	let pageSuccess = $state('');
 
-	onMount(async () => {
+	function applyTypingState(data: unknown) {
+		if (!selectedConversation) return;
+		const payload = data as { userId: string; conversationId: string; isTyping: boolean };
+		if (payload.conversationId !== selectedConversation.id) return;
+		if (payload.userId === currentUser?.id) return;
+
+		if (payload.isTyping) {
+			typingUsers = Array.from(new Set([...typingUsers, payload.userId]));
+		} else {
+			typingUsers = typingUsers.filter((id) => id !== payload.userId);
+		}
+	}
+
+		onMount(async () => {
+		pageError = '';
 		await authStore.initialize();
 		currentUser = $authStore.user;
+
+		const token = localStorage.getItem('accessToken');
+		if (token) {
+			websocket.connect(token);
+			stopTypingListener = websocket.on('user_typing', applyTypingState);
+			stopMessageListener = websocket.on('message_received', (data) => {
+				const message = data as Message;
+				conversations = conversations.map((conversation) => {
+					if (conversation.id !== message.conversationId) {
+						return conversation;
+					}
+
+					const isSelected = selectedConversation?.id === conversation.id;
+					return {
+						...conversation,
+						lastMessage: message,
+						createdAt: message.createdAt,
+						unreadCount: isSelected
+							? 0
+							: (conversation.unreadCount || 0) + 1
+					};
+				});
+				if (selectedConversation && message.conversationId === selectedConversation.id) {
+					messages = [...messages, message];
+				}
+			});
+		}
 
 		try {
 			const response = await messagesApi.getConversations();
@@ -31,35 +80,92 @@
 			}
 		} catch (error) {
 			console.error('Failed to load conversations:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to load conversations';
 		} finally {
 			loading = false;
 		}
 	});
 
+	onDestroy(() => {
+		if (currentRoomId) {
+			websocket.leaveConversation(currentRoomId);
+		}
+		if (typingTimeout) {
+			clearTimeout(typingTimeout);
+		}
+		stopTypingListener?.();
+		stopMessageListener?.();
+		websocket.disconnect();
+	});
+
 	async function selectConversation(conversationId: string) {
+		pageError = '';
 		try {
+			if (currentRoomId) {
+				websocket.leaveConversation(currentRoomId);
+			}
+
 			const response = await messagesApi.getConversation(conversationId);
 			selectedConversation = response.conversation;
 			messages = response.messages;
+			typingUsers = [];
+			conversations = conversations.map((conversation) =>
+				conversation.id === conversationId
+					? {
+							...conversation,
+							unreadCount: 0
+						}
+					: conversation
+			);
+
+			websocket.joinConversation(conversationId);
+			currentRoomId = conversationId;
+			await messagesApi.markAsRead(conversationId);
 		} catch (error) {
 			console.error('Failed to load conversation:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to load conversation';
 		}
 	}
 
 	async function sendMessage() {
 		if (messageInput.trim() && selectedConversation) {
+			pageError = '';
 			try {
 				const response = await messagesApi.sendMessage(selectedConversation.id, messageInput);
 				messages = [...messages, response.message];
+				websocket.sendTypingIndicator(selectedConversation.id, false);
 				messageInput = '';
 			} catch (error) {
 				console.error('Failed to send message:', error);
+				pageError = error instanceof Error ? error.message : 'Failed to send message';
 			}
 		}
 	}
 
-	function getOtherParticipant(conversation: Conversation): User | undefined {
-		return conversation.participants?.find(p => p.user)?.user;
+	function showComingSoon(feature: string) {
+		pageError = '';
+		pageSuccess = `${feature} is coming soon.`;
+		setTimeout(() => {
+			pageSuccess = '';
+		}, 2000);
+	}
+
+	function handleTypingInput() {
+		if (!selectedConversation) return;
+
+		websocket.sendTypingIndicator(selectedConversation.id, true);
+		if (typingTimeout) {
+			clearTimeout(typingTimeout);
+		}
+		typingTimeout = setTimeout(() => {
+			if (selectedConversation) {
+				websocket.sendTypingIndicator(selectedConversation.id, false);
+			}
+		}, 1200);
+	}
+
+	function getOtherParticipant(conversation: Conversation): { id: string; name: string; avatarUrl?: string } | undefined {
+		return conversation.participants?.find((p) => p.user && p.user.id !== currentUser?.id)?.user;
 	}
 
 	const filteredConversations = $derived(
@@ -89,6 +195,11 @@
 
 	<main class="pt-16 pb-20 lg:ml-72 lg:pt-0 lg:pb-0">
 		<div class="container mx-auto h-[calc(100vh-7rem)] px-4 lg:p-4">
+			{#if pageError || pageSuccess}
+				<div class="mb-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 {pageError ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}">
+					{pageError || pageSuccess}
+				</div>
+			{/if}
 			<Card class="flex h-full overflow-hidden">
 				<!-- Chat List -->
 				<div class="w-full border-r border-gray-200 dark:border-gray-700 md:w-80">
@@ -126,12 +237,19 @@
 									<Avatar src={otherUser?.avatarUrl} alt={otherUser?.name || 'User'} size="lg" />
 									<div class="flex-1 overflow-hidden">
 										<div class="flex items-center justify-between">
-											<p class="font-medium text-gray-900 dark:text-white truncate">{otherUser?.name || 'Unknown'}</p>
-											<span class="text-xs text-gray-500">{formatTime(conversation.createdAt)}</span>
-										</div>
-										<p class="truncate text-sm text-gray-500">{$t.messages.startConversation}</p>
+									<p class="font-medium text-gray-900 dark:text-white truncate">{otherUser?.name || 'Unknown'}</p>
+										<span class="text-xs text-gray-500">{formatTime(conversation.createdAt)}</span>
 									</div>
-								</button>
+									<div class="flex items-center justify-between gap-2">
+										<p class="truncate text-sm text-gray-500">{$t.messages.startConversation}</p>
+										{#if (conversation.unreadCount || 0) > 0}
+											<span class="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-xs font-semibold text-white">
+												{conversation.unreadCount}
+											</span>
+										{/if}
+									</div>
+								</div>
+							</button>
 							{/each}
 						{/if}
 					</div>
@@ -145,25 +263,32 @@
 						<div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
 							<div class="flex items-center gap-3">
 								<Avatar src={otherUser?.avatarUrl} alt={otherUser?.name || 'User'} size="lg" />
-								<div>
-									<p class="font-medium text-gray-900 dark:text-white">{otherUser?.name || 'Unknown'}</p>
+							<div>
+								<p class="font-medium text-gray-900 dark:text-white">{otherUser?.name || 'Unknown'}</p>
+								{#if typingUsers.length > 0}
+									<p class="text-sm text-rose-500">Typing...</p>
+								{:else}
 									<p class="text-sm text-gray-500">{$t.messages.online}</p>
-								</div>
+								{/if}
 							</div>
+						</div>
 							<div class="flex items-center gap-2">
-								<button
-									class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
-								>
+							<button
+								class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+								onclick={() => showComingSoon('Voice call')}
+							>
 									<Phone class="h-5 w-5 text-gray-600 dark:text-gray-400" />
 								</button>
-								<button
-									class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
-								>
+							<button
+								class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+								onclick={() => showComingSoon('Video call')}
+							>
 									<Video class="h-5 w-5 text-gray-600 dark:text-gray-400" />
 								</button>
-								<button
-									class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
-								>
+							<button
+								class="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+								onclick={() => showComingSoon('Conversation options')}
+							>
 									<MoreVertical class="h-5 w-5 text-gray-600 dark:text-gray-400" />
 								</button>
 							</div>
@@ -200,6 +325,7 @@
 								<input
 									type="text"
 									bind:value={messageInput}
+									oninput={handleTypingInput}
 									placeholder={$t.messages.typeMessage}
 									class="flex-1 h-10 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 								/>

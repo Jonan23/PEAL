@@ -1,15 +1,20 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, ArrowRight, Check } from 'lucide-svelte';
+	import { ArrowLeft, ArrowRight, Check, Camera } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button.svelte';
 	import Input from '$lib/components/ui/input.svelte';
 	import Avatar from '$lib/components/ui/avatar.svelte';
 	import { t } from '$lib/i18n';
+	import { renderGoogleButton } from '$lib/auth/google';
 	import { authStore } from '$lib/stores/auth';
 
 	let step = $state(1);
 	let loading = $state(false);
 	let error = $state('');
+	let avatarPreview = $state<string | null>(null);
+	let fileInput: HTMLInputElement;
+	let googleContainer: HTMLDivElement;
 
 	let formData = $state({
 		email: '',
@@ -40,6 +45,44 @@
 			formData.skills = [...formData.skills, skill];
 		}
 	}
+
+	function handleAvatarClick() {
+		fileInput?.click();
+	}
+
+	function handleFileSelect(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) {
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				avatarPreview = e.target?.result as string;
+			};
+			reader.readAsDataURL(file);
+		}
+	}
+
+	onMount(async () => {
+		if (!googleContainer) return;
+
+		try {
+			await renderGoogleButton(googleContainer, async (idToken) => {
+				loading = true;
+				error = '';
+
+				const result = await authStore.googleAuth(idToken, formData.role || 'woman');
+				if (result.success) {
+					goto('/dashboard');
+				} else {
+					error = result.error || 'Google sign-up failed';
+				}
+
+				loading = false;
+			});
+		} catch {
+			// Google auth not configured for this environment.
+		}
+	});
 
 	async function handleNext() {
 		error = '';
@@ -105,6 +148,17 @@
 
 		<!-- Form Card -->
 		<div class="card p-6">
+			<div class="mb-5 flex justify-center" bind:this={googleContainer}></div>
+
+			<div class="relative mb-5">
+				<div class="absolute inset-0 flex items-center">
+					<div class="w-full border-t border-gray-200 dark:border-gray-700"></div>
+				</div>
+				<div class="relative flex justify-center text-sm">
+					<span class="bg-white px-4 text-gray-500 dark:bg-gray-900">{$t.auth.continueWith}</span>
+				</div>
+			</div>
+
 			{#if error}
 				<div class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
 					{error}
@@ -201,8 +255,29 @@
 							>{$t.auth.profilePhoto}</label
 						>
 						<div class="flex items-center gap-4">
-							<Avatar src="" alt="Profile" size="xl" />
-							<Button variant="secondary" size="sm">{$t.auth.uploadPhoto}</Button>
+							<div class="relative">
+								<Avatar 
+									src={avatarPreview || ''} 
+									alt="Profile" 
+									size="xl" 
+								/>
+								<button
+									type="button"
+									onclick={handleAvatarClick}
+									class="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg transition-transform hover:scale-110 hover:bg-rose-600"
+									title={$t.auth.uploadPhoto}
+								>
+									<Camera class="h-4 w-4" />
+								</button>
+								<input
+									bind:this={fileInput}
+									type="file"
+									accept="image/*"
+									onchange={handleFileSelect}
+									class="hidden"
+								/>
+							</div>
+							<p class="text-sm text-gray-500">{$t.auth.uploadPhoto}</p>
 						</div>
 					</div>
 					<div>

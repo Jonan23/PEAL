@@ -8,6 +8,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  hasSeenOnboarding: boolean;
 }
 
 function createAuthStore() {
@@ -16,22 +17,12 @@ function createAuthStore() {
     isAuthenticated: false,
     isLoading: true,
     error: null,
+    hasSeenOnboarding: false,
   };
 
   const { subscribe, set, update } = writable<AuthState>(initialState);
-
-  function loadUserFromStorage(): User | null {
-    if (!browser) return null;
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        return JSON.parse(userStr);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
+  let initialized = false;
+  let initializationPromise: Promise<void> | null = null;
 
   function setUser(user: User | null) {
     if (browser && user) {
@@ -47,22 +38,72 @@ function createAuthStore() {
     }));
   }
 
+  function hasSeenOnboarding(): boolean {
+    if (!browser) return false;
+    return localStorage.getItem("hasSeenOnboarding") === "true";
+  }
+
+  function markOnboardingSeen() {
+    if (browser) {
+      localStorage.setItem("hasSeenOnboarding", "true");
+    }
+    update((state) => ({ ...state, hasSeenOnboarding: true }));
+  }
+
   return {
     subscribe,
 
     async initialize() {
-      const storedUser = loadUserFromStorage();
-      const accessToken = browser ? localStorage.getItem("accessToken") : null;
+      if (initialized) {
+        return;
+      }
 
-      if (accessToken && storedUser) {
-        try {
-          const response = await authApi.getMe();
-          setUser(response.user);
-        } catch {
-          this.logout();
+      if (initializationPromise) {
+        await initializationPromise;
+        return;
+      }
+
+      initializationPromise = (async () => {
+        const accessToken = browser
+          ? localStorage.getItem("accessToken")
+          : null;
+        const refreshToken = browser
+          ? localStorage.getItem("refreshToken")
+          : null;
+        const onboardingSeen = hasSeenOnboarding();
+
+        if (accessToken && refreshToken) {
+          try {
+            const response = await authApi.getMe();
+            setUser(response.user);
+            update((state) => ({
+              ...state,
+              hasSeenOnboarding: onboardingSeen,
+            }));
+          } catch {
+            this.logout();
+          }
+        } else if (accessToken && !refreshToken) {
+          api.clearAuthTokens();
+          setUser(null);
+          update((state) => ({
+            ...state,
+            hasSeenOnboarding: onboardingSeen,
+          }));
+        } else {
+          update((state) => ({
+            ...state,
+            isLoading: false,
+            hasSeenOnboarding: onboardingSeen,
+          }));
         }
-      } else {
-        update((state) => ({ ...state, isLoading: false }));
+        initialized = true;
+      })();
+
+      try {
+        await initializationPromise;
+      } finally {
+        initializationPromise = null;
       }
     },
 
@@ -105,9 +146,28 @@ function createAuthStore() {
       }
     },
 
+    async googleAuth(idToken: string, role?: "woman" | "sponsor") {
+      update((state) => ({ ...state, isLoading: true, error: null }));
+
+      try {
+        const response = await authApi.google(idToken, role);
+        api.setAuthTokens(response.accessToken, response.refreshToken);
+        setUser(response.user);
+        return { success: true };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Google sign-in failed";
+        update((state) => ({ ...state, isLoading: false, error: message }));
+        return { success: false, error: message };
+      }
+    },
+
     async logout() {
       try {
-        await authApi.logout();
+        const refreshToken = browser
+          ? localStorage.getItem("refreshToken") || undefined
+          : undefined;
+        await authApi.logout(refreshToken);
       } catch {
         // Ignore logout errors
       }
@@ -133,6 +193,8 @@ function createAuthStore() {
     clearError() {
       update((state) => ({ ...state, error: null }));
     },
+
+    markOnboardingSeen,
   };
 }
 

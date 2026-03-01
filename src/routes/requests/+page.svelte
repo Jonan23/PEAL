@@ -10,12 +10,10 @@
 		Plus,
 		Search,
 		Users,
-		Heart,
 		TrendingUp,
 		DollarSign,
 		Target,
-		MessageCircle,
-		Share2
+		Heart
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { requestsApi } from '$lib/api';
@@ -25,13 +23,19 @@
 	let loading = $state(true);
 	let searchQuery = $state('');
 	let selectedCategory = $state('all');
+	let fundedRequestsCount = $state(0);
 
 	const categories = ['all', 'education', 'business', 'healthcare', 'technology', 'arts'];
 
 	onMount(async () => {
 		try {
-			const response = await requestsApi.getAll({ status: 'active' });
-			requests = response.requests;
+			const [activeResponse, fundedResponse] = await Promise.all([
+				requestsApi.getAll({ status: 'active' }),
+				requestsApi.getAll({ status: 'funded' })
+			]);
+
+			requests = activeResponse.requests;
+			fundedRequestsCount = fundedResponse.requests.length;
 		} catch (error) {
 			console.error('Failed to load requests:', error);
 		} finally {
@@ -42,7 +46,10 @@
 	const stats = $derived({
 		activeRequests: requests.length,
 		raisedThisMonth: requests.reduce((sum, r) => sum + r.currentAmount, 0),
-		successRate: 78
+		successRate:
+			requests.length + fundedRequestsCount > 0
+				? Math.round((fundedRequestsCount / (requests.length + fundedRequestsCount)) * 100)
+				: 0
 	});
 
 	const filteredRequests = $derived(
@@ -79,10 +86,12 @@
 						<p class="text-gray-600 dark:text-gray-400">{$t.requests.subtitle}</p>
 					</div>
 
-					<Button>
-						<Plus class="mr-2 h-4 w-4" />
-						{$t.requests.createRequest}
-					</Button>
+					<a href="/requests/new">
+						<Button>
+							<Plus class="mr-2 h-4 w-4" />
+							{$t.requests.createRequest}
+						</Button>
+					</a>
 				</div>
 			</div>
 
@@ -209,22 +218,6 @@
 									<span class="flex items-center gap-1">
 										{calculateProgress(request.currentAmount, request.goalAmount)}% {$t.requests.funded}
 									</span>
-								</div>
-
-								<!-- Social Icons -->
-								<div class="mb-4 flex items-center gap-6 text-gray-500 dark:text-gray-400">
-									<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
-										<Heart class="h-4 w-4" />
-										<span class="text-sm">{Math.floor(Math.random() * 500) + 50}</span>
-									</button>
-									<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
-										<MessageCircle class="h-4 w-4" />
-										<span class="text-sm">{Math.floor(Math.random() * 100) + 10}</span>
-									</button>
-									<button class="flex items-center gap-1.5 transition-colors hover:text-rose-500">
-										<Share2 class="h-4 w-4" />
-										<span class="text-sm">{Math.floor(Math.random() * 50) + 5}</span>
-									</button>
 								</div>
 
 								<Button class="w-full">

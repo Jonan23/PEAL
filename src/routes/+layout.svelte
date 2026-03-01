@@ -4,8 +4,8 @@
 	import { theme } from '$lib/stores/theme';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
-	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import { isRTL } from '$lib/i18n';
+	import { authStore } from '$lib/stores/auth';
 
 	let { children } = $props();
 
@@ -21,6 +21,8 @@
 	}
 
 	onMount(() => {
+		authStore.initialize();
+
 		// Apply initial theme
 		let currentValue = 'light';
 		const unsub = theme.subscribe((value) => {
@@ -37,10 +39,8 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
-<AdaptiveNavigation />
-
 <main
-	class="min-h-[calc(100dvh-7.5rem)] overflow-x-hidden pt-16 pb-14 lg:min-h-screen lg:pt-0 lg:pb-0 lg:pl-72"
+	class="min-h-screen overflow-x-hidden"
 	dir={$isRTL ? 'rtl' : 'ltr'}
 >
 	{@render children()}

@@ -1,6 +1,8 @@
 import { api } from "./client";
 import type { ProgressCallback } from "./types";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 export interface UploadResult {
   url: string;
   key: string;
@@ -13,14 +15,18 @@ export async function uploadFile(
   type: "video" | "image",
   onProgress?: ProgressCallback,
 ): Promise<UploadResult> {
-  const contentType = file.type;
+  const contentType = resolveFileContentType(file);
   const fileName = file.name;
 
   const allowedImageTypes = [
     "image/jpeg",
+    "image/jpg",
     "image/png",
     "image/gif",
     "image/webp",
+    "image/avif",
+    "image/heic",
+    "image/heif",
   ];
   const allowedVideoTypes = ["video/mp4", "video/webm", "video/quicktime"];
 
@@ -51,7 +57,7 @@ export async function uploadFile(
 
   const { uploadUrl, fileUrl, key } = presignedResponse;
 
-  await uploadToUrl(uploadUrl, file, contentType, onProgress);
+  await uploadToUrl(resolveUploadUrl(uploadUrl), file, contentType, onProgress);
 
   const completeResponse = await api.post<UploadResult>(
     "/api/uploads/complete",
@@ -64,7 +70,7 @@ export async function uploadFile(
 
   return {
     ...completeResponse,
-    url: fileUrl,
+    url: completeResponse.url || fileUrl,
   };
 }
 
@@ -98,8 +104,27 @@ async function uploadToUrl(
 
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Type", contentType);
+    const token = localStorage.getItem("accessToken");
+    if (token && shouldAttachApiAuth(url)) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
     xhr.send(file);
   });
+}
+
+function resolveUploadUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  return new URL(url, API_BASE_URL).toString();
+}
+
+function shouldAttachApiAuth(url: string): boolean {
+  const apiOrigin = new URL(API_BASE_URL).origin;
+  const targetOrigin = new URL(url, API_BASE_URL).origin;
+
+  return apiOrigin === targetOrigin;
 }
 
 export function validateVideoFile(file: File): {
@@ -107,9 +132,10 @@ export function validateVideoFile(file: File): {
   error?: string;
 } {
   const allowedTypes = ["video/mp4", "video/webm", "video/quicktime"];
+  const contentType = resolveFileContentType(file);
   const maxSize = 500 * 1024 * 1024;
 
-  if (!allowedTypes.includes(file.type)) {
+  if (!allowedTypes.includes(contentType)) {
     return {
       valid: false,
       error: "Invalid video type. Allowed: MP4, WebM, MOV",
@@ -127,13 +153,23 @@ export function validateImageFile(file: File): {
   valid: boolean;
   error?: string;
 } {
-  const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  const allowedTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/avif",
+    "image/heic",
+    "image/heif",
+  ];
+  const contentType = resolveFileContentType(file);
   const maxSize = 10 * 1024 * 1024;
 
-  if (!allowedTypes.includes(file.type)) {
+  if (!allowedTypes.includes(contentType)) {
     return {
       valid: false,
-      error: "Invalid image type. Allowed: JPEG, PNG, GIF, WebP",
+      error: "Invalid image type. Allowed: JPEG, PNG, GIF, WebP, AVIF, HEIC",
     };
   }
 
@@ -159,6 +195,29 @@ export function formatFileSize(bytes: number): string {
 
 export function getFileExtension(filename: string): string {
   return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2);
+}
+
+function resolveFileContentType(file: File): string {
+  if (file.type && file.type.trim().length > 0) {
+    return file.type;
+  }
+
+  const extension = getFileExtension(file.name).toLowerCase();
+  const extensionMap: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    avif: "image/avif",
+    heic: "image/heic",
+    heif: "image/heif",
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+  };
+
+  return extensionMap[extension] || "application/octet-stream";
 }
 
 export function generateThumbnail(

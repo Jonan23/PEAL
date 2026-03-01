@@ -5,7 +5,13 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const accessToken = event.cookies.get("accessToken");
   const refreshToken = event.cookies.get("refreshToken");
 
-  const publicRoutes = ["/login", "/register", "/forgot-password", "/"];
+  const publicRoutes = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/",
+    "/onboarding",
+  ];
   const protectedRoutes = [
     "/dashboard",
     "/feed",
@@ -14,7 +20,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
     "/success",
     "/messages",
     "/profile",
-    "/onboarding",
+    "/events",
+    "/goals",
   ];
 
   const isPublicRoute = publicRoutes.some(
@@ -28,11 +35,14 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   if (accessToken) {
     event.locals.accessToken = accessToken;
-    event.locals.isAuthenticated = true;
   }
 
   if (refreshToken) {
     event.locals.refreshToken = refreshToken;
+  }
+
+  if (accessToken || refreshToken) {
+    event.locals.isAuthenticated = true;
   }
 
   if (isProtectedRoute && !accessToken && !refreshToken) {

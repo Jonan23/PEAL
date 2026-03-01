@@ -1,5 +1,6 @@
 import { writable, derived } from "svelte/store";
 import { browser } from "$app/environment";
+import { io, type Socket } from "socket.io-client";
 
 export interface WebSocketMessage {
   event: string;
@@ -19,7 +20,7 @@ interface WebSocketState {
 }
 
 function createWebSocketStore() {
-  let socket: WebSocket | null = null;
+  let socket: Socket | null = null;
   let reconnectAttempts = 0;
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
@@ -32,55 +33,59 @@ function createWebSocketStore() {
 
   const messageHandlers = new Map<string, Set<(data: unknown) => void>>();
 
+  function bindSocketEvents(): void {
+    if (!socket) return;
+
+    socket.on("connect", () => {
+      reconnectAttempts = 0;
+      update((s) => ({
+        ...s,
+        connected: true,
+        connecting: false,
+        error: null,
+      }));
+    });
+
+    socket.on("disconnect", () => {
+      update((s) => ({ ...s, connected: false, connecting: false }));
+    });
+
+    socket.on("connect_error", () => {
+      reconnectAttempts += 1;
+      const reachedLimit = reconnectAttempts >= maxReconnectAttempts;
+      update((s) => ({
+        ...s,
+        connected: false,
+        connecting: !reachedLimit,
+        error: reachedLimit ? "WebSocket reconnection failed" : null,
+      }));
+    });
+
+    socket.onAny((event: string, payload: unknown) => {
+      const handlers = messageHandlers.get(event);
+      if (handlers) {
+        handlers.forEach((handler) => handler(payload));
+      }
+    });
+  }
+
   function connect(token: string) {
-    if (!browser || socket?.readyState === WebSocket.OPEN) return;
+    if (!browser || socket?.connected) return;
 
     update((s) => ({ ...s, connecting: true, error: null }));
 
-    const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:3001";
+    const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || "http://localhost:3001";
 
     try {
-      socket = new WebSocket(`${wsUrl}?token=${token}`);
+      socket = io(wsUrl, {
+        auth: { token },
+        transports: ["websocket"],
+        reconnection: true,
+        reconnectionAttempts: maxReconnectAttempts,
+        reconnectionDelay: reconnectDelay,
+      });
 
-      socket.onopen = () => {
-        reconnectAttempts = 0;
-        update((s) => ({
-          ...s,
-          connected: true,
-          connecting: false,
-          error: null,
-        }));
-      };
-
-      socket.onclose = () => {
-        update((s) => ({ ...s, connected: false, connecting: false }));
-
-        if (reconnectAttempts < maxReconnectAttempts) {
-          reconnectAttempts++;
-          setTimeout(() => connect(token), reconnectDelay * reconnectAttempts);
-        }
-      };
-
-      socket.onerror = () => {
-        update((s) => ({
-          ...s,
-          connected: false,
-          connecting: false,
-          error: "WebSocket connection error",
-        }));
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          const handlers = messageHandlers.get(message.event);
-          if (handlers) {
-            handlers.forEach((handler) => handler(message.data));
-          }
-        } catch {
-          console.error("Failed to parse WebSocket message");
-        }
-      };
+      bindSocketEvents();
     } catch {
       update((s) => ({ ...s, connecting: false, error: "Failed to connect" }));
     }
@@ -88,7 +93,8 @@ function createWebSocketStore() {
 
   function disconnect() {
     if (socket) {
-      socket.close();
+      socket.removeAllListeners();
+      socket.disconnect();
       socket = null;
     }
     update((s) => ({ ...s, connected: false, connecting: false }));
@@ -106,8 +112,8 @@ function createWebSocketStore() {
   }
 
   function emit(event: string, data: unknown) {
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ event, data }));
+    if (socket?.connected) {
+      socket.emit(event, data);
     }
   }
 

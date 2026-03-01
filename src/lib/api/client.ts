@@ -33,6 +33,7 @@ class ApiClient {
     if (!browser) return;
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
+    this.syncAuthCookies(accessToken, refreshToken);
   }
 
   private clearTokens(): void {
@@ -40,6 +41,27 @@ class ApiClient {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
+    this.syncAuthCookies(null, null);
+  }
+
+  private syncAuthCookies(
+    accessToken: string | null,
+    refreshToken: string | null,
+  ): void {
+    if (!browser) return;
+
+    const cookieOptions = "Path=/; SameSite=Lax";
+    if (accessToken) {
+      document.cookie = `accessToken=${encodeURIComponent(accessToken)}; ${cookieOptions}`;
+    } else {
+      document.cookie = `accessToken=; ${cookieOptions}; Max-Age=0`;
+    }
+
+    if (refreshToken) {
+      document.cookie = `refreshToken=${encodeURIComponent(refreshToken)}; ${cookieOptions}`;
+    } else {
+      document.cookie = `refreshToken=; ${cookieOptions}; Max-Age=0`;
+    }
   }
 
   private async refreshAccessToken(): Promise<string> {

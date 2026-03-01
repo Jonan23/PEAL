@@ -14,7 +14,8 @@
 		Calendar,
 		SlidersHorizontal,
 		Star,
-		Sparkles
+		Sparkles,
+		X
 	} from 'lucide-svelte';
 	import { t } from '$lib/i18n';
 	import { mentorsApi, matchingApi } from '$lib/api/endpoints';
@@ -27,6 +28,18 @@
 	let searchQuery = $state('');
 	let selectedSkill = $state('all');
 	let showRecommended = $state(true);
+	let userId = $state<string | null>(null);
+	let userRole = $state<string | null>(null);
+	let hasMentorProfile = $state(false);
+	let showMentorForm = $state(false);
+	let mentorBio = $state('');
+	let mentorYearsExperience = $state<number>(1);
+	let mentorSkills = $state<string[]>([]);
+	let mentorSubmitting = $state(false);
+	let mentorError = $state('');
+	let mentorSuccess = $state('');
+	let pageError = $state('');
+	let pageSuccess = $state('');
 
 	const skills = [
 		'Technology',
@@ -44,17 +57,23 @@
 
 	onMount(async () => {
 		await authStore.initialize();
-		const userId = $authStore.user?.id;
+		userId = $authStore.user?.id || null;
+		userRole = $authStore.user?.role || null;
 
 		try {
 			const [mentorsRes, matchesRes] = await Promise.all([
 				mentorsApi.getAll(),
 				userId ? matchingApi.getRecommendations(userId) : Promise.resolve({ matches: [] })
 			]);
-			mentors = mentorsRes.mentors;
-			recommendedMentors = matchesRes.matches;
+			mentors = mentorsRes.mentors || [];
+			recommendedMentors = matchesRes.matches || [];
+			hasMentorProfile =
+				!!userId && mentors.some((mentor) => mentor.userId === userId || mentor.user?.id === userId);
 		} catch (error) {
 			console.error('Failed to load mentors:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to load mentors';
+			mentors = [];
+			recommendedMentors = [];
 		} finally {
 			loading = false;
 		}
@@ -71,10 +90,82 @@
 	);
 
 	async function handleConnect(mentorId: string) {
+		pageError = '';
+		pageSuccess = '';
 		try {
 			await mentorsApi.connect(mentorId);
+			pageSuccess = 'Connection request sent.';
 		} catch (error) {
 			console.error('Failed to connect:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to connect';
+		}
+	}
+
+	function clearMentorFilters() {
+		selectedSkill = 'all';
+		searchQuery = '';
+	}
+
+	function toggleMentorSkill(skill: string) {
+		if (mentorSkills.includes(skill)) {
+			mentorSkills = mentorSkills.filter((s) => s !== skill);
+			return;
+		}
+
+		if (mentorSkills.length < 5) {
+			mentorSkills = [...mentorSkills, skill];
+		}
+	}
+
+	async function handleBecomeMentor() {
+		mentorError = '';
+		mentorSuccess = '';
+
+		if (userRole !== 'sponsor') {
+			mentorError = 'Only sponsors can become mentors.';
+			return;
+		}
+
+		if (hasMentorProfile) {
+			mentorSuccess = 'Your mentor profile is already active.';
+			showMentorForm = false;
+			return;
+		}
+
+		showMentorForm = !showMentorForm;
+	}
+
+	async function submitMentorProfile() {
+		mentorError = '';
+		mentorSuccess = '';
+
+		if (!mentorBio.trim()) {
+			mentorError = 'Please add a short mentor bio.';
+			return;
+		}
+
+		if (mentorSkills.length === 0) {
+			mentorError = 'Please select at least one skill.';
+			return;
+		}
+
+		mentorSubmitting = true;
+		try {
+			await mentorsApi.createProfile({
+				bio: mentorBio.trim(),
+				yearsExperience: mentorYearsExperience,
+				skills: mentorSkills
+			});
+
+			const mentorsRes = await mentorsApi.getAll();
+			mentors = mentorsRes.mentors || [];
+			hasMentorProfile = true;
+			showMentorForm = false;
+			mentorSuccess = 'Mentor profile created successfully.';
+		} catch (error) {
+			mentorError = error instanceof Error ? error.message : 'Failed to create mentor profile';
+		} finally {
+			mentorSubmitting = false;
 		}
 	}
 </script>
@@ -100,10 +191,78 @@
 
 			<!-- Become a Mentor Button -->
 			<div class="mb-4">
-				<Button>
+				<Button onclick={handleBecomeMentor} variant={hasMentorProfile ? 'secondary' : 'primary'}>
 					<Briefcase class="mr-2 h-4 w-4" />
-					{$t.mentors.becomeMentor}
+					{hasMentorProfile ? 'Mentor Profile Active' : $t.mentors.becomeMentor}
 				</Button>
+
+				{#if mentorError}
+					<p class="mt-2 text-sm text-red-600 dark:text-red-400">{mentorError}</p>
+				{/if}
+				{#if mentorSuccess}
+					<p class="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{mentorSuccess}</p>
+				{/if}
+
+				{#if showMentorForm}
+					<Card class="mt-4 p-4">
+						<div class="mb-3 flex items-center justify-between">
+							<h3 class="text-base font-semibold text-gray-900 dark:text-white">Create Mentor Profile</h3>
+							<button
+								onclick={() => (showMentorForm = false)}
+								class="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+							>
+								<X class="h-4 w-4" />
+							</button>
+						</div>
+
+						<div class="space-y-3">
+							<div>
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Bio</label>
+								<textarea
+									bind:value={mentorBio}
+									rows="3"
+									placeholder="Share your mentoring focus and experience"
+									class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
+								></textarea>
+							</div>
+
+							<div>
+								<label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Years of experience</label>
+								<input
+									type="number"
+									bind:value={mentorYearsExperience}
+									min="1"
+									max="50"
+									class="h-10 w-32 rounded-xl border border-gray-200 bg-white px-3 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
+								/>
+							</div>
+
+							<div>
+								<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+									Select up to 5 skills
+								</label>
+								<div class="flex flex-wrap gap-2">
+									{#each skills as skill}
+										<button
+											onclick={() => toggleMentorSkill(skill)}
+											class="rounded-full px-3 py-1.5 text-sm font-medium transition-all {mentorSkills.includes(skill)
+												? 'bg-rose-500 text-white'
+												: 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}"
+										>
+											{skill}
+										</button>
+									{/each}
+								</div>
+							</div>
+
+							<div class="pt-2">
+								<Button onclick={submitMentorProfile} disabled={mentorSubmitting}>
+									{mentorSubmitting ? 'Creating profile...' : 'Create Mentor Profile'}
+								</Button>
+							</div>
+						</div>
+					</Card>
+				{/if}
 			</div>
 
 			<!-- Search -->
@@ -129,11 +288,18 @@
 					{/each}
 				</select>
 
-				<Button variant="secondary" size="sm">
+				<Button variant="secondary" size="sm" onclick={clearMentorFilters}>
 					<SlidersHorizontal class="mr-1 h-4 w-4" />
-					{$t.mentors.moreFilters}
+					Clear filters
 				</Button>
 			</div>
+
+			{#if pageSuccess}
+				<p class="mb-4 text-sm text-emerald-600 dark:text-emerald-400">{pageSuccess}</p>
+			{/if}
+			{#if pageError}
+				<p class="mb-4 text-sm text-red-600 dark:text-red-400">{pageError}</p>
+			{/if}
 
 			<!-- Mentors List -->
 			{#if loading}
@@ -217,7 +383,7 @@
 											</span>
 										{/if}
 									</div>
-									<button class="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+									<button class="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-800" onclick={() => handleConnect(mentor.id)}>
 										<MessageCircle class="h-5 w-5 text-gray-400" />
 									</button>
 								</div>

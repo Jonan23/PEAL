@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import AdaptiveNavigation from '$lib/components/adaptive-navigation.svelte';
 	import Card from '$lib/components/ui/card.svelte';
 	import Button from '$lib/components/ui/button.svelte';
@@ -9,28 +10,37 @@
 	import { type Language } from '$lib/i18n/translations';
 	import { authStore } from '$lib/stores/auth';
 	import { settingsApi, usersApi } from '$lib/api';
+	import { uploadFile } from '$lib/api/upload';
 	import type { User, UserSettings } from '$lib/api/types';
 	import {
 		Save,
 		Moon,
 		Sun,
-		Bell,
 		Shield,
 		User as UserIcon,
 		X,
-		Users,
-		Heart,
-		TrendingUp,
 		Download,
 		Trash2,
 		Lock,
-		AlertTriangle
+		AlertTriangle,
+		Camera,
+		LogOut
 	} from 'lucide-svelte';
 
 	let currentUser = $state<User | null>(null);
 	let settings = $state<UserSettings | null>(null);
 	let loading = $state(true);
 	let saving = $state(false);
+	let loggingOut = $state(false);
+	let uploadingAvatar = $state(false);
+	let avatarPreview = $state<string | null>(null);
+	let selectedAvatarFile = $state<File | null>(null);
+	let saveError = $state('');
+	let saveSuccess = $state('');
+	let accountNotice = $state('');
+	let accountError = $state('');
+	let deletingAccount = $state(false);
+	let fileInput: HTMLInputElement;
 
 	let selectedTheme = $state('light');
 	let selectedLanguage = $state<Language>('en');
@@ -73,12 +83,6 @@
 		'Social Impact'
 	];
 
-	const impactStats = $derived({
-		supporters: 89,
-		mentors: 5,
-		raised: 12500
-	});
-
 	theme.subscribe((value) => {
 		selectedTheme = value;
 	});
@@ -96,11 +100,23 @@
 			email = currentUser.email || '';
 			location = currentUser.location || '';
 			bio = currentUser.bio || '';
+			publicProfile = currentUser.isPublic ?? true;
 		}
 
 		try {
-			const settingsResponse = await settingsApi.get();
+			if (!currentUser) {
+				loading = false;
+				return;
+			}
+
+			const [settingsResponse, skillsResponse, interestsResponse] = await Promise.all([
+				settingsApi.get(),
+				usersApi.getSkills(currentUser.id),
+				usersApi.getInterests(currentUser.id)
+			]);
 			settings = settingsResponse.settings;
+			userSkills = skillsResponse.skills;
+			userInterests = interestsResponse.interests;
 
 			if (settings) {
 				emailNotifications = settings.emailNotifications;
@@ -152,14 +168,30 @@
 		if (!currentUser) return;
 
 		saving = true;
+		saveError = '';
+		saveSuccess = '';
 		try {
-			await Promise.all([
-				usersApi.update(currentUser.id, {
-					name,
-					email,
-					location,
-					bio
-				}),
+			let avatarUrl = currentUser.avatarUrl;
+
+			if (selectedAvatarFile) {
+				uploadingAvatar = true;
+				const uploaded = await uploadFile(selectedAvatarFile, 'image');
+				avatarUrl = uploaded.url;
+				uploadingAvatar = false;
+			}
+
+			await usersApi.update(currentUser.id, {
+				name,
+				email,
+				location,
+				bio,
+				avatarUrl,
+				isPublic: publicProfile
+			});
+
+			const secondaryResults = await Promise.allSettled([
+				usersApi.updateSkills(currentUser.id, userSkills),
+				usersApi.updateInterests(currentUser.id, userInterests),
 				settingsApi.update({
 					emailNotifications,
 					pushNotifications,
@@ -171,11 +203,121 @@
 				})
 			]);
 
-			await authStore.refreshUser();
+			const refreshedUser = await authStore.refreshUser();
+			if (refreshedUser) {
+				currentUser = refreshedUser;
+			}
+			selectedAvatarFile = null;
+			avatarPreview = null;
+			if (fileInput) {
+				fileInput.value = '';
+			}
+
+			const hasSecondaryFailure = secondaryResults.some((result) => result.status === 'rejected');
+			saveSuccess = hasSecondaryFailure
+				? 'Profile photo and core profile updated. Some preferences could not be saved.'
+				: 'Changes saved successfully.';
 		} catch (error) {
 			console.error('Failed to save settings:', error);
+			saveError = error instanceof Error ? error.message : 'Failed to save changes';
 		} finally {
+			uploadingAvatar = false;
 			saving = false;
+		}
+	}
+
+	function handleAvatarClick() {
+		fileInput?.click();
+	}
+
+	function handleFileSelect(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) {
+			selectedAvatarFile = file;
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				avatarPreview = e.target?.result as string;
+			};
+			reader.readAsDataURL(file);
+		}
+	}
+
+	async function handleLogout() {
+		loggingOut = true;
+		try {
+			await authStore.logout();
+			goto('/login');
+		} finally {
+			loggingOut = false;
+		}
+	}
+
+	function handlePasswordUpdate() {
+		accountError = '';
+		accountNotice =
+			'Password updates are managed through your auth provider today. Contact support if you need an immediate reset.';
+	}
+
+	function handleDownloadData() {
+		accountError = '';
+		try {
+			const exportData = {
+				profile: {
+					id: currentUser?.id,
+					name,
+					email,
+					location,
+					bio,
+					avatarUrl: currentUser?.avatarUrl,
+					isPublic: publicProfile,
+					skills: userSkills,
+					interests: userInterests
+				},
+				preferences: {
+					emailNotifications,
+					pushNotifications,
+					mentorMessages,
+					supporterUpdates,
+					weeklyDigest,
+					language: selectedLanguage,
+					theme: selectedTheme
+				},
+				exportedAt: new Date().toISOString()
+			};
+
+			const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `peal-account-export-${new Date().toISOString().slice(0, 10)}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			accountNotice = 'Your account data export has been downloaded.';
+		} catch (error) {
+			accountError = error instanceof Error ? error.message : 'Failed to export your data';
+		}
+	}
+
+	async function handleDeleteAccount() {
+		if (!currentUser) return;
+		accountNotice = '';
+		accountError = '';
+
+		const confirmed = confirm('Delete your account permanently? This action cannot be undone.');
+		if (!confirmed) return;
+
+		deletingAccount = true;
+		try {
+			await usersApi.delete(currentUser.id);
+			await authStore.logout();
+			goto('/register');
+		} catch (error) {
+			accountError = error instanceof Error ? error.message : 'Failed to delete account';
+		} finally {
+			deletingAccount = false;
 		}
 	}
 </script>
@@ -201,10 +343,29 @@
 				</h2>
 				<Card class="p-5">
 					<div class="mb-6 flex items-start gap-4">
-						<Avatar src={currentUser?.avatarUrl} alt={currentUser?.name || 'User'} size="xl" />
+						<div class="relative">
+							<Avatar 
+								src={avatarPreview || currentUser?.avatarUrl} 
+								alt={currentUser?.name || 'User'} 
+								size="xl" 
+							/>
+							<button
+								onclick={handleAvatarClick}
+								class="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg transition-transform hover:scale-110 hover:bg-rose-600"
+								title={$t.settings.changePhoto}
+							>
+								<Camera class="h-4 w-4" />
+							</button>
+							<input
+								bind:this={fileInput}
+								type="file"
+								accept="image/*"
+								onchange={handleFileSelect}
+								class="hidden"
+							/>
+						</div>
 						<div class="flex-1">
-							<Button variant="secondary" size="sm">{$t.settings.changePhoto}</Button>
-							<p class="mt-2 text-xs text-gray-500">{$t.settings.photoHint}</p>
+							<p class="text-sm text-gray-500">{$t.settings.photoHint}</p>
 						</div>
 					</div>
 					<div class="grid gap-4">
@@ -493,51 +654,6 @@
 				</Card>
 			</section>
 
-			<!-- Impact Section -->
-			<section class="mb-8">
-				<h2
-					class="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"
-				>
-					<TrendingUp class="h-5 w-5" />
-					Your Impact
-				</h2>
-				<Card class="p-5">
-					<div class="grid grid-cols-3 gap-4">
-						<div class="text-center">
-							<div
-								class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-900/30"
-							>
-								<Users class="h-6 w-6 text-rose-500" />
-							</div>
-							<p class="text-2xl font-bold text-gray-900 dark:text-white">
-								{impactStats.supporters}
-							</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Supporters</p>
-						</div>
-						<div class="text-center">
-							<div
-								class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30"
-							>
-								<UserIcon class="h-6 w-6 text-violet-500" />
-							</div>
-							<p class="text-2xl font-bold text-gray-900 dark:text-white">{impactStats.mentors}</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Mentors</p>
-						</div>
-						<div class="text-center">
-							<div
-								class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30"
-							>
-								<Heart class="h-6 w-6 text-emerald-500" />
-							</div>
-							<p class="text-2xl font-bold text-gray-900 dark:text-white">
-								${impactStats.raised.toLocaleString()}
-							</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Raised</p>
-						</div>
-					</div>
-				</Card>
-			</section>
-
 			<!-- Privacy Section -->
 			<section class="mb-8">
 				<h2
@@ -578,6 +694,28 @@
 				</h2>
 				<Card class="p-5">
 					<div class="space-y-4">
+						{#if accountNotice}
+							<p class="text-sm text-emerald-600 dark:text-emerald-400">{accountNotice}</p>
+						{/if}
+						{#if accountError}
+							<p class="text-sm text-red-600 dark:text-red-400">{accountError}</p>
+						{/if}
+
+						<div
+							class="flex items-center justify-between rounded-xl border border-gray-200 p-4 dark:border-gray-700"
+						>
+							<div class="flex items-center gap-3">
+								<LogOut class="h-5 w-5 text-gray-500" />
+								<div>
+									<p class="font-medium text-gray-900 dark:text-white">Sign out</p>
+									<p class="text-sm text-gray-500 dark:text-gray-400">End your current session</p>
+								</div>
+							</div>
+							<Button variant="secondary" size="sm" onclick={handleLogout} disabled={loggingOut}>
+								{loggingOut ? 'Signing out...' : 'Logout'}
+							</Button>
+						</div>
+
 						<div
 							class="flex items-center justify-between rounded-xl border border-gray-200 p-4 dark:border-gray-700"
 						>
@@ -588,7 +726,7 @@
 									<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.changePasswordDesc}</p>
 								</div>
 							</div>
-							<Button variant="secondary" size="sm">Update</Button>
+							<Button variant="secondary" size="sm" onclick={handlePasswordUpdate}>Update</Button>
 						</div>
 						<div
 							class="flex items-center justify-between rounded-xl border border-gray-200 p-4 dark:border-gray-700"
@@ -600,7 +738,7 @@
 									<p class="text-sm text-gray-500 dark:text-gray-400">{$t.settings.saveYourDataDesc}</p>
 								</div>
 							</div>
-							<Button variant="secondary" size="sm">Download</Button>
+							<Button variant="secondary" size="sm" onclick={handleDownloadData}>Download</Button>
 						</div>
 						<div
 							class="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20"
@@ -612,17 +750,25 @@
 									<p class="text-sm text-red-500 dark:text-red-400">{$t.settings.deleteAccountDesc}</p>
 								</div>
 							</div>
-							<Button variant="destructive" size="sm">Delete</Button>
+							<Button variant="destructive" size="sm" onclick={handleDeleteAccount} disabled={deletingAccount}>
+								{deletingAccount ? 'Deleting...' : 'Delete'}
+							</Button>
 						</div>
 					</div>
 				</Card>
 			</section>
 
 			<!-- Save Button -->
-			<Button class="w-full" onclick={handleSave} disabled={saving}>
+			<Button class="w-full" onclick={handleSave} disabled={saving || uploadingAvatar}>
 				<Save class="mr-2 h-4 w-4" />
-				{saving ? 'Saving...' : $t.settings.saveChanges}
+				{saving || uploadingAvatar ? 'Saving...' : $t.settings.saveChanges}
 			</Button>
+			{#if saveSuccess}
+				<p class="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{saveSuccess}</p>
+			{/if}
+			{#if saveError}
+				<p class="mt-3 text-sm text-red-600 dark:text-red-400">{saveError}</p>
+			{/if}
 		</div>
 	</main>
 </div>

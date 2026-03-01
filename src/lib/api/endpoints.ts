@@ -23,15 +23,19 @@ export const authApi = {
     password: string;
     name: string;
     role: string;
-    skills?: string[];
-    bio?: string;
-    location?: string;
   }) => api.post<AuthResponse>("/api/auth/register", data),
 
   login: (email: string, password: string) =>
     api.post<AuthResponse>("/api/auth/login", { email, password }),
 
-  logout: () => api.post("/api/auth/logout"),
+  google: (idToken: string, role?: "woman" | "sponsor") =>
+    api.post<AuthResponse>("/api/auth/google", {
+      idToken,
+      ...(role ? { role } : {}),
+    }),
+
+  logout: (refreshToken?: string) =>
+    api.post("/api/auth/logout", refreshToken ? { refreshToken } : {}),
 
   getMe: () => api.get<{ user: User }>("/api/auth/me"),
 
@@ -48,11 +52,31 @@ export const usersApi = {
   update: (id: string, data: Partial<User>) =>
     api.put<{ user: User }>(`/api/users/${id}`, data),
 
+  delete: (id: string) => api.delete(`/api/users/${id}`),
+
   getFollowers: (id: string) =>
-    api.get<{ followers: User[] }>(`/api/users/${id}/followers`),
+    api
+      .get<{ data: User[] }>(`/api/users/${id}/followers`)
+      .then((response) => ({ followers: response.data })),
 
   getFollowing: (id: string) =>
-    api.get<{ following: User[] }>(`/api/users/${id}/following`),
+    api
+      .get<{ data: User[] }>(`/api/users/${id}/following`)
+      .then((response) => ({ following: response.data })),
+
+  getSkills: (id: string) =>
+    api.get<{ skills: string[] }>(`/api/users/${id}/skills`),
+
+  updateSkills: (id: string, skills: string[]) =>
+    api.put<{ skills: string[] }>(`/api/users/${id}/skills`, { skills }),
+
+  getInterests: (id: string) =>
+    api.get<{ interests: string[] }>(`/api/users/${id}/interests`),
+
+  updateInterests: (id: string, interests: string[]) =>
+    api.put<{ interests: string[] }>(`/api/users/${id}/interests`, {
+      interests,
+    }),
 
   follow: (id: string) => api.post(`/api/users/${id}/follow`),
 
@@ -79,7 +103,10 @@ export const videosApi = {
 
   getById: (id: string) => api.get<{ video: Video }>(`/api/videos/${id}`),
 
-  getTrending: () => api.get<{ videos: Video[] }>("/api/videos/trending"),
+  getTrending: () =>
+    api.get<{ data: Video[] }>("/api/videos/trending").then((res) => ({
+      videos: res.data,
+    })),
 
   create: (data: {
     title: string;
@@ -103,24 +130,42 @@ export const videosApi = {
     api.post(`/api/videos/${id}/comments`, { content }),
 
   getComments: (id: string) =>
-    api.get<{ comments: unknown[] }>(`/api/videos/${id}/comments`),
+    api.get<{
+      data: unknown[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(`/api/videos/${id}/comments`),
 };
 
 export const mentorsApi = {
   getAll: (params?: {
-    skills?: string;
+    skill?: string;
     availability?: string;
     search?: string;
   }) => {
     const searchParams = new URLSearchParams();
-    if (params?.skills) searchParams.set("skills", params.skills);
+    if (params?.skill) searchParams.set("skill", params.skill);
     if (params?.availability)
       searchParams.set("availability", params.availability);
-    if (params?.search) searchParams.set("search", params.search);
     const query = searchParams.toString();
-    return api.get<{ mentors: Mentor[] }>(
-      `/api/mentors${query ? `?${query}` : ""}`,
-    );
+    return api
+      .get<{
+        data: Mentor[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>(`/api/mentors${query ? `?${query}` : ""}`)
+      .then((response) => ({
+        mentors: response.data,
+        pagination: response.pagination,
+      }));
   },
 
   getById: (id: string) => api.get<{ mentor: Mentor }>(`/api/mentors/${id}`),
@@ -131,20 +176,25 @@ export const mentorsApi = {
     yearsExperience?: number;
   }) => api.post<{ mentor: Mentor }>("/api/mentors", data),
 
-  updateProfile: (data: Partial<Mentor>) =>
-    api.put<{ mentor: Mentor }>("/api/mentors", data),
+  updateProfile: (id: string, data: Partial<Mentor>) =>
+    api.put<{ mentor: Mentor }>(`/api/mentors/${id}`, data),
 
   connect: (mentorId: string) => api.post(`/api/mentors/${mentorId}/connect`),
+
+  respondToConnection: (
+    mentorId: string,
+    connectionId: string,
+    action: "accept" | "reject",
+  ) =>
+    api.put(`/api/mentors/${mentorId}/connection`, {
+      connectionId,
+      action,
+    }),
 
   getConnections: () =>
     api.get<{ connections: unknown[] }>("/api/mentors/connections"),
 
   getMentees: () => api.get<{ mentees: User[] }>("/api/mentors/mentees"),
-
-  updateConnectionStatus: (
-    connectionId: string,
-    status: "accepted" | "rejected",
-  ) => api.patch(`/api/mentors/connections/${connectionId}`, { status }),
 };
 
 export const requestsApi = {
@@ -158,9 +208,11 @@ export const requestsApi = {
     if (params?.category) searchParams.set("category", params.category);
     if (params?.search) searchParams.set("search", params.search);
     const query = searchParams.toString();
-    return api.get<{ requests: FundingRequest[] }>(
-      `/api/requests${query ? `?${query}` : ""}`,
-    );
+    return api
+      .get<{
+        data: FundingRequest[];
+      }>(`/api/requests${query ? `?${query}` : ""}`)
+      .then((response) => ({ requests: response.data }));
   },
 
   getById: (id: string) =>
@@ -180,25 +232,67 @@ export const requestsApi = {
 
   delete: (id: string) => api.delete(`/api/requests/${id}`),
 
-  donate: (
-    id: string,
+  getDonations: (id: string) =>
+    api
+      .get<{ donations: unknown[] }>(`/api/payments/donations/${id}`)
+      .then((response) => ({ donations: response.donations })),
+};
+
+export const donationsApi = {
+  createIntent: (
+    requestId: string,
     amount: number,
     message?: string,
     isAnonymous?: boolean,
-  ) => api.post(`/api/requests/${id}/donate`, { amount, message, isAnonymous }),
+  ) =>
+    api.post<{
+      clientSecret: string;
+      donationId: string;
+      paymentIntentId?: string;
+    }>("/api/payments/create-donation-intent", {
+      requestId,
+      amount,
+      message,
+      isAnonymous,
+    }),
 
-  getDonations: (id: string) =>
-    api.get<{ donations: unknown[] }>(`/api/requests/${id}/donations`),
+  confirm: (donationId: string, paymentIntentId?: string) =>
+    api.post<{
+      success: boolean;
+      message: string;
+      donation: { id: string; amount: number; requestId: string };
+    }>("/api/payments/confirm-donation", {
+      donationId,
+      paymentIntentId,
+    }),
 };
 
 export const storiesApi = {
   getAll: (params?: { featured?: boolean }) => {
-    const searchParams = new URLSearchParams();
-    if (params?.featured) searchParams.set("featured", "true");
-    const query = searchParams.toString();
-    return api.get<{ stories: SuccessStory[] }>(
-      `/api/stories${query ? `?${query}` : ""}`,
-    );
+    if (params?.featured) {
+      return api
+        .get<{
+          story: SuccessStory;
+        }>("/api/stories/featured")
+        .then((response) => ({
+          stories: [response.story],
+          pagination: { page: 1, limit: 1, total: 1, totalPages: 1 },
+        }));
+    }
+    return api
+      .get<{
+        data: SuccessStory[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>("/api/stories")
+      .then((response) => ({
+        stories: response.data,
+        pagination: response.pagination,
+      }));
   },
 
   getById: (id: string) =>
@@ -222,26 +316,87 @@ export const storiesApi = {
 
 export const messagesApi = {
   getConversations: () =>
-    api.get<{ conversations: Conversation[] }>("/api/messages/conversations"),
+    api
+      .get<{
+        data: Array<{
+          id: string;
+          participants: Array<{ id: string; name: string; avatarUrl?: string }>;
+          lastMessage?: Message;
+          unreadCount?: number;
+          lastMessageAt?: string;
+          createdAt?: string;
+        }>;
+      }>("/api/messages")
+      .then((response) => ({
+        conversations: response.data.map(
+          (conversation): Conversation => ({
+            id: conversation.id,
+            createdAt:
+              conversation.createdAt ||
+              conversation.lastMessageAt ||
+              new Date().toISOString(),
+            unreadCount: conversation.unreadCount || 0,
+            lastMessage: conversation.lastMessage,
+            participants: (conversation.participants || []).map(
+              (participant) => ({
+                id: `${conversation.id}:${participant.id}`,
+                conversationId: conversation.id,
+                userId: participant.id,
+                lastMessageAt:
+                  conversation.lastMessageAt ||
+                  conversation.createdAt ||
+                  new Date().toISOString(),
+                unreadCount: conversation.unreadCount || 0,
+                user: participant,
+              }),
+            ),
+          }),
+        ),
+      })),
 
   getConversation: (id: string) =>
-    api.get<{ conversation: Conversation; messages: Message[] }>(
-      `/api/messages/conversations/${id}`,
-    ),
+    api
+      .get<{
+        conversation: {
+          id: string;
+          createdAt?: string;
+          participants: Array<{ id: string; name: string; avatarUrl?: string }>;
+          messages: Message[];
+        };
+      }>(`/api/messages/${id}`)
+      .then((response) => ({
+        conversation: <Conversation>{
+          id: response.conversation.id,
+          createdAt:
+            response.conversation.createdAt || new Date().toISOString(),
+          unreadCount: 0,
+          participants: response.conversation.participants.map(
+            (participant) => ({
+              id: `${response.conversation.id}:${participant.id}`,
+              conversationId: response.conversation.id,
+              userId: participant.id,
+              lastMessageAt: new Date().toISOString(),
+              unreadCount: 0,
+              user: participant,
+            }),
+          ),
+        },
+        messages: response.conversation.messages,
+      })),
 
-  createConversation: (participantIds: string[]) =>
-    api.post<{ conversation: Conversation }>("/api/messages/conversations", {
-      participantIds,
-    }),
+  createConversation: (_participantIds: string[]) => {
+    throw new Error(
+      "Backend does not support empty conversation creation. Send the first message instead.",
+    );
+  },
 
   sendMessage: (conversationId: string, content: string) =>
-    api.post<{ message: Message }>(
-      `/api/messages/conversations/${conversationId}/messages`,
-      { content },
-    ),
+    api.post<{ message: Message }>(`/api/messages/${conversationId}/messages`, {
+      content,
+    }),
 
   markAsRead: (conversationId: string) =>
-    api.patch(`/api/messages/conversations/${conversationId}/read`),
+    api.put(`/api/messages/${conversationId}/read`),
 };
 
 export const notificationsApi = {
@@ -283,22 +438,22 @@ export const uploadsApi = {
   getPresignedUrl: (
     filename: string,
     contentType: string,
-    type: "video" | "image",
+    _type: "video" | "image",
   ) =>
-    api.post<{ uploadUrl: string; fileUrl: string }>(
-      "/api/uploads/presigned-url",
-      {
-        filename,
-        contentType,
-        type,
-      },
-    ),
+    api.post<{
+      uploadUrl: string;
+      fileUrl: string;
+      key: string;
+      maxSize: number;
+    }>("/api/uploads/presigned-url", {
+      fileName: filename,
+      contentType,
+    }),
 
-  completeUpload: (fileUrl: string) =>
-    api.post("/api/uploads/complete", { fileUrl }),
+  completeUpload: (key: string, fileName: string, contentType: string) =>
+    api.post("/api/uploads/complete", { key, fileName, contentType }),
 
-  deleteFile: (fileUrl: string) =>
-    api.delete("/api/uploads", { body: { fileUrl } }),
+  deleteFile: (key: string) => api.delete(`/api/uploads/${key}`),
 };
 
 export const searchApi = {

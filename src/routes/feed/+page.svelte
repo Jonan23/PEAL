@@ -30,6 +30,9 @@
 	let selectedVideo = $state<Video | null>(null);
 	let selectedHashtag = $state('');
 	let copiedVideoId = $state<string | null>(null);
+	let pageError = $state('');
+	let pageSuccess = $state('');
+	let showTopLiked = $state(false);
 
 	const categories = [
 		'all',
@@ -52,11 +55,13 @@
 	]);
 
 	onMount(async () => {
+		pageError = '';
 		try {
 			const response = await videosApi.getAll({ limit: 50 });
 			videos = response.data;
 		} catch (error) {
 			console.error('Failed to load videos:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to load videos';
 		} finally {
 			loading = false;
 		}
@@ -76,6 +81,7 @@
 					));
 				return matchesSearch && matchesCategory && matchesHashtag;
 			})
+			.sort((a, b) => (showTopLiked ? b.likesCount - a.likesCount : 0))
 	);
 
 	function selectHashtag(tag: string) {
@@ -89,6 +95,7 @@
 	}
 
 	async function handleLike(video: Video) {
+		pageError = '';
 		try {
 			await videosApi.like(video.id);
 			videos = videos.map(v => 
@@ -96,10 +103,13 @@
 			);
 		} catch (error) {
 			console.error('Failed to like video:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to like video';
 		}
 	}
 
 	async function handleShare(video: Video) {
+		pageError = '';
+		pageSuccess = '';
 		const shareUrl = `${window.location.origin}/feed?v=${video.id}`;
 		const shareData = {
 			title: video.title,
@@ -113,6 +123,7 @@
 			} else {
 				await navigator.clipboard.writeText(shareUrl);
 				copiedVideoId = video.id;
+				pageSuccess = 'Link copied to clipboard.';
 				setTimeout(() => {
 					copiedVideoId = null;
 				}, 2000);
@@ -123,8 +134,13 @@
 		} catch (error) {
 			if ((error as Error).name !== 'AbortError') {
 				console.error('Failed to share:', error);
+				pageError = error instanceof Error ? error.message : 'Failed to share video';
 			}
 		}
+	}
+
+	function toggleTopLiked() {
+		showTopLiked = !showTopLiked;
 	}
 </script>
 
@@ -147,9 +163,9 @@
 
 					<!-- Action Buttons -->
 					<div class="flex items-center gap-2">
-						<Button variant="secondary" size="sm">
+						<Button variant={showTopLiked ? 'primary' : 'secondary'} size="sm" onclick={toggleTopLiked}>
 							<Heart class="mr-1 h-4 w-4" />
-							{$t.common.like}
+							{showTopLiked ? 'Top liked' : $t.common.like}
 						</Button>
 						<a href="/feed/upload">
 							<Button variant="primary" size="sm">
@@ -157,12 +173,19 @@
 								{$t.nav.shareVideo}
 							</Button>
 						</a>
-						<Button variant="secondary" size="sm">
+						<Button variant="secondary" size="sm" onclick={() => (selectedHashtag = '')}>
 							<SlidersHorizontal class="mr-1 h-4 w-4" />
 							{$t.common.filter}
 						</Button>
 					</div>
 				</div>
+
+				{#if pageSuccess}
+					<p class="text-sm text-emerald-600 dark:text-emerald-400">{pageSuccess}</p>
+				{/if}
+				{#if pageError}
+					<p class="text-sm text-red-600 dark:text-red-400">{pageError}</p>
+				{/if}
 
 				<!-- Search -->
 				<div class="flex items-center gap-3">
@@ -175,7 +198,7 @@
 							class="h-10 w-full rounded-xl border border-gray-200 bg-white pr-4 pl-10 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800"
 						/>
 					</div>
-					<Button variant="secondary" size="sm">
+					<Button variant="secondary" size="sm" onclick={() => (selectedHashtag = '')}>
 						<Filter class="h-4 w-4" />
 					</Button>
 				</div>
@@ -322,6 +345,7 @@
 								</button>
 								<button
 									class="flex items-center gap-2 text-gray-600 transition-colors hover:text-rose-500 dark:text-gray-400"
+									onclick={() => (selectedVideo = video)}
 								>
 									<MessageCircle class="h-5 w-5" />
 									<span class="text-sm font-medium">{formatNumber(video.commentsCount)}</span>

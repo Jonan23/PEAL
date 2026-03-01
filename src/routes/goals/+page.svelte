@@ -17,6 +17,8 @@
 	let loading = $state(true);
 	let showAddForm = $state(false);
 	let expandedGoal = $state<string | null>(null);
+	let pageError = $state('');
+	let pageSuccess = $state('');
 
 	let newGoal = $state({
 		title: '',
@@ -26,10 +28,7 @@
 		priority: 'medium'
 	});
 
-	let newMilestone = $state({
-		goalId: '',
-		title: ''
-	});
+	let milestoneDrafts = $state<Record<string, string>>({});
 
 	const categories = [
 		{ value: 'business', label: 'Business' },
@@ -52,11 +51,13 @@
 
 	async function loadGoals() {
 		loading = true;
+		pageError = '';
 		try {
 			const response = await goalsApi.getAll();
 			goals = response.goals;
 		} catch (error) {
 			console.error('Failed to load goals:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to load goals';
 		} finally {
 			loading = false;
 		}
@@ -64,6 +65,8 @@
 
 	async function handleAddGoal(e: Event) {
 		e.preventDefault();
+		pageError = '';
+		pageSuccess = '';
 		try {
 			await goalsApi.create({
 				...newGoal,
@@ -71,40 +74,55 @@
 			});
 			showAddForm = false;
 			newGoal = { title: '', description: '', category: 'business', targetDate: '', priority: 'medium' };
+			pageSuccess = 'Goal created successfully.';
 			await loadGoals();
 		} catch (error) {
 			console.error('Failed to create goal:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to create goal';
 		}
 	}
 
 	async function handleAddMilestone(goalId: string) {
-		if (!newMilestone.title.trim()) return;
+		const title = (milestoneDrafts[goalId] || '').trim();
+		if (!title) return;
+		pageError = '';
+		pageSuccess = '';
 		
 		try {
-			await goalsApi.addMilestone(goalId, { title: newMilestone.title });
-			newMilestone = { goalId: '', title: '' };
+			await goalsApi.addMilestone(goalId, { title });
+			milestoneDrafts = { ...milestoneDrafts, [goalId]: '' };
+			pageSuccess = 'Milestone added successfully.';
 			await loadGoals();
 		} catch (error) {
 			console.error('Failed to add milestone:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to add milestone';
 		}
 	}
 
 	async function toggleMilestone(goalId: string, milestone: GoalMilestone) {
+		pageError = '';
+		pageSuccess = '';
 		try {
 			await goalsApi.updateMilestone(goalId, milestone.id, { completed: !milestone.completed });
+			pageSuccess = milestone.completed ? 'Milestone marked incomplete.' : 'Milestone completed.';
 			await loadGoals();
 		} catch (error) {
 			console.error('Failed to update milestone:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to update milestone';
 		}
 	}
 
 	async function deleteGoal(id: string) {
 		if (!confirm('Are you sure you want to delete this goal?')) return;
+		pageError = '';
+		pageSuccess = '';
 		try {
 			await goalsApi.delete(id);
+			pageSuccess = 'Goal deleted successfully.';
 			await loadGoals();
 		} catch (error) {
 			console.error('Failed to delete goal:', error);
+			pageError = error instanceof Error ? error.message : 'Failed to delete goal';
 		}
 	}
 
@@ -142,6 +160,13 @@
 					Add Goal
 				</Button>
 			</div>
+
+			{#if pageSuccess}
+				<p class="mb-4 text-sm text-emerald-600 dark:text-emerald-400">{pageSuccess}</p>
+			{/if}
+			{#if pageError}
+				<p class="mb-4 text-sm text-red-600 dark:text-red-400">{pageError}</p>
+			{/if}
 
 			<!-- Add Goal Form -->
 			{#if showAddForm}
@@ -287,30 +312,30 @@
 											</div>
 										{/if}
 
-										<div class="flex gap-2">
-											<input
-												type="text"
-												placeholder="Add a milestone..."
-												class="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
-												onkeydown={(e) => {
-													if (e.key === 'Enter') {
-														newMilestone.goalId = goal.id;
-														newMilestone.title = (e.target as HTMLInputElement).value;
-														handleAddMilestone(goal.id);
-														(e.target as HTMLInputElement).value = '';
-													}
-												}}
-											/>
-											<Button size="sm" variant="secondary" onclick={() => {
-												const input = document.querySelector(`input[data-goal="${goal.id}"]`) as HTMLInputElement;
-												if (input?.value) {
-													newMilestone.goalId = goal.id;
-													newMilestone.title = input.value;
+									<div class="flex gap-2">
+										<input
+											type="text"
+											placeholder="Add a milestone..."
+											value={milestoneDrafts[goal.id] || ''}
+											class="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800"
+											onkeydown={(e) => {
+												if (e.key === 'Enter') {
+													milestoneDrafts = {
+														...milestoneDrafts,
+														[goal.id]: (e.target as HTMLInputElement).value
+													};
 													handleAddMilestone(goal.id);
-													input.value = '';
 												}
-											}}>Add</Button>
-										</div>
+											}}
+											oninput={(e) => {
+												milestoneDrafts = {
+													...milestoneDrafts,
+													[goal.id]: (e.target as HTMLInputElement).value
+												};
+											}}
+										/>
+										<Button size="sm" variant="secondary" onclick={() => handleAddMilestone(goal.id)}>Add</Button>
+									</div>
 									</div>
 								{/if}
 							</div>

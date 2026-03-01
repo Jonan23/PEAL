@@ -46,6 +46,7 @@
   "dependencies": {
     "@melt-ui/svelte": "^0.86.6",
     "@sveltejs/adapter-vercel": "^6.3.2",
-    "lucide-svelte": "^0.564.0"
+    "lucide-svelte": "^0.564.0",
+    "socket.io-client": "^4.8.3"
   }
 }

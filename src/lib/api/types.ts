@@ -77,6 +77,7 @@ export interface SuccessStory {
 export interface Conversation {
   id: string;
   createdAt: string;
+  unreadCount?: number;
   participants?: ConversationParticipant[];
   lastMessage?: Message;
 }
@@ -87,7 +88,7 @@ export interface ConversationParticipant {
   userId: string;
   lastMessageAt: string;
   unreadCount: number;
-  user?: User;
+  user?: Pick<User, "id" | "name" | "avatarUrl">;
 }
 
 export interface Message {
@@ -97,7 +98,7 @@ export interface Message {
   content: string;
   isRead: boolean;
   createdAt: string;
-  sender?: User;
+  sender?: Pick<User, "id" | "name" | "avatarUrl">;
 }
 
 export interface Notification {

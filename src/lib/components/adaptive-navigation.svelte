@@ -10,15 +10,14 @@
 		PlusCircle,
 		Upload,
 		MessageCircle,
-		Bell,
 		Search
 	} from 'lucide-svelte';
 	import Avatar from './ui/avatar.svelte';
 	import ThemeToggle from './theme-toggle.svelte';
-	import { mockUsers } from '$lib/data/mock';
 	import { t } from '$lib/i18n';
+	import { authStore } from '$lib/stores/auth';
 
-	const currentUser = mockUsers[0];
+	const currentUser = $derived($authStore.user);
 
 	const navItems = $derived([
 		{ href: '/dashboard', icon: Home, label: $t.common.home },
@@ -62,21 +61,18 @@
 			class="rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
 		>
 			<div class="flex items-center gap-3">
-				<Avatar src={currentUser.avatar} alt={currentUser.name} size="lg" />
+				<Avatar src={currentUser?.avatarUrl} alt={currentUser?.name || 'User'} size="lg" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate font-medium text-gray-900 dark:text-gray-100">{currentUser.name}</p>
-					<p class="text-sm text-gray-500 capitalize dark:text-gray-400">{currentUser.role}</p>
+					<p class="truncate font-medium text-gray-900 dark:text-gray-100">
+						{currentUser?.name || 'Guest'}
+					</p>
+					<p class="text-sm text-gray-500 capitalize dark:text-gray-400">
+						{currentUser?.role || 'user'}
+					</p>
 				</div>
 			</div>
-			{#if currentUser.skills && currentUser.skills.length > 0}
-				<div class="mt-2 flex flex-wrap gap-1">
-					{#each currentUser.skills.slice(0, 3) as skill}
-						<span
-							class="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
-							>{skill}</span
-						>
-					{/each}
-				</div>
+			{#if currentUser?.location}
+				<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{currentUser.location}</p>
 			{/if}
 		</div>
 
@@ -150,7 +146,7 @@
 			</button>
 			<ThemeToggle />
 			<a href="/profile/settings" class="h-10 w-10">
-				<Avatar src={currentUser.avatar} alt={currentUser.name} size="md" />
+				<Avatar src={currentUser?.avatarUrl} alt={currentUser?.name || 'User'} size="md" />
 			</a>
 		</div>
 	</div>
